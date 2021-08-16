@@ -1,5 +1,6 @@
 use log::info;
 use once_cell::sync::OnceCell;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reqwest::header::{self, HeaderValue};
 use std::{fs, io::Cursor, os::unix::prelude::MetadataExt};
 
@@ -53,6 +54,9 @@ fn fetch_url(url: String, file_name: String) -> Result<(), String> {
         // .headers(headers.clone())
         .send()
         .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err("请求失败!".to_string());
+    }
     let mut file = std::fs::File::create(file_name).map_err(|e| e.to_string())?;
     let bytes = response.bytes().map_err(|e| e.to_string())?;
     if bytes.len() < 1024 {
@@ -97,7 +101,8 @@ pub fn file_exist(path: &str) -> bool {
 
 pub fn download_chems(start: usize) {
     init_header();
-    (start..start + 1000000).for_each(|f| {
+    let step = 1000000;
+    (start * step..(start + 1) * step).into_par_iter().for_each(|f| {
         let path = format!("data/{}", get_path_by_id(f as usize));
         let url = format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f);
 
@@ -108,7 +113,7 @@ pub fn download_chems(start: usize) {
                 info!("id = {}, result = {:?}", f, result);
             }
         } else {
-            info!("already download {}", f);
+            // info!("already download {}", f);
         }
 
 
