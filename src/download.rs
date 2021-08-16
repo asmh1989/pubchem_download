@@ -2,7 +2,7 @@ use log::info;
 use once_cell::sync::OnceCell;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reqwest::header::{self, HeaderValue};
-use std::{fs, io::Cursor, os::unix::prelude::MetadataExt};
+use std::{cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt};
 
 static HEADERS: OnceCell<header::HeaderMap> = OnceCell::new();
 
@@ -47,7 +47,7 @@ fn fetch_url(url: String, file_name: String) -> Result<(), String> {
 
     let client = reqwest::blocking::Client::new();
 
-    let headers = HEADERS.get().expect("header not init");
+    // let headers = HEADERS.get().expect("header not init");
 
     let response = client
         .get(url)
@@ -102,7 +102,7 @@ pub fn file_exist(path: &str) -> bool {
 pub fn download_chems(start: usize) {
     init_header();
     let step = 1000000;
-    (start * step..(start + 1) * step).into_par_iter().for_each(|f| {
+    (max(1, start * step)..(start + 1) * step).into_par_iter().for_each(|f| {
         let path = format!("data/{}", get_path_by_id(f as usize));
         let url = format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f);
 
