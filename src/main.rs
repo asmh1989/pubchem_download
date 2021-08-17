@@ -25,6 +25,10 @@ fn main() {
 
     info!("start download = {}, threads = {}", start, threads);
 
+    if threads > 12 {
+        threads = 12;
+    }
+
     rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build_global()
