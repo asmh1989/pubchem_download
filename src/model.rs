@@ -4,7 +4,7 @@ use mongodb::bson;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::{Db, COLLECTION_CID},
+    db::{Db, COLLECTION_CID_NOT_FOUND},
     filter_cid,
 };
 
@@ -39,7 +39,11 @@ impl PubChemNotFound {
             }
         };
 
-        if let Err(e) = Db::save(COLLECTION_CID, filter_cid!(self.cid.clone()), doc.clone()) {
+        if let Err(e) = Db::save(
+            COLLECTION_CID_NOT_FOUND,
+            filter_cid!(self.cid.clone()),
+            doc.clone(),
+        ) {
             info!("db save error{} ", e);
             return Err(format!("db save error{} ", e));
         }

@@ -6,7 +6,7 @@ use reqwest::header::{self, HeaderValue};
 use std::{cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt};
 
 use crate::{
-    db::{init_db, Db, COLLECTION_CID},
+    db::{init_db, Db, COLLECTION_CID_NOT_FOUND},
     filter_cid,
     model::PubChemNotFound,
 };
@@ -143,7 +143,7 @@ pub fn download_chems(start: usize, use_db: bool) {
     (max(1, start * step)..(start + 1) * step)
         .into_par_iter()
         .for_each(|f| {
-            if !use_db || !Db::contians(COLLECTION_CID, filter_cid!(&f.to_string())) {
+            if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
                 get_chem(f, use_db);
             } else {
                 // info!("cid = {} is 404 not found, not need download again!", f);

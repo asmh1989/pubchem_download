@@ -1311,7 +1311,6 @@ dependencies = [
 name = "pub_chem_download"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "log",
  "log4rs",
  "mongodb",
@@ -1319,7 +1318,6 @@ dependencies = [
  "rayon",
  "reqwest",
  "serde",
- "serde_derive",
  "serde_json",
 ]
 

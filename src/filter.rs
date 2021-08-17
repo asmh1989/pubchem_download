@@ -1,16 +1,27 @@
-use std::{fs, path::PathBuf};
+use std::fs;
 
 use log::info;
+use mongodb::bson::{self, DateTime};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 
-use crate::chem::{parse_json, Chem};
+use crate::{
+    chem::{parse_json, Chem},
+    db::{Db, COLLECTION_FILTER_SMILES_SOLUBILITY},
+    filter_cid,
+};
 
-#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Filter {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    id: Option<bson::oid::ObjectId>,
     pub cid: i64,
     pub smiles: String,
     pub molecular_weight: String,
     pub solubility: Vec<String>,
+    pub create_time: DateTime,
+    pub update_time: DateTime,
 }
 
 impl Filter {
@@ -20,16 +31,41 @@ impl Filter {
         molecular_weight: String,
         solubility: Vec<String>,
     ) -> Self {
+        let date = DateTime::now();
+
         Self {
+            id: None,
             cid,
             smiles,
             molecular_weight,
             solubility,
+            create_time: date.clone(),
+            update_time: date,
         }
+    }
+
+    pub fn save_db(&self) -> Result<(), String> {
+        let doc = match bson::to_bson(&self) {
+            Ok(d) => d.as_document().unwrap().clone(),
+            Err(e) => {
+                info!("to_bson err {}", e);
+                return Err(format!("to_bson error : {}", e));
+            }
+        };
+
+        if let Err(e) = Db::save(
+            COLLECTION_FILTER_SMILES_SOLUBILITY,
+            filter_cid!(self.cid.clone()),
+            doc.clone(),
+        ) {
+            info!("db save error{} ", e);
+            return Err(format!("db save error{} ", e));
+        }
+        Ok(())
     }
 }
 
-pub fn get_json_files(path: &str, vec: &mut Vec<PathBuf>) {
+pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
     let paths = fs::read_dir(path).unwrap();
 
     paths.for_each(|f| {
@@ -40,7 +76,13 @@ pub fn get_json_files(path: &str, vec: &mut Vec<PathBuf>) {
             } else if let Some(k) = p.extension() {
                 if k == "json" {
                     // info!("found json file : {:?}", p);
-                    vec.push(p);
+                    vec.push(
+                        p.clone()
+                            .into_os_string()
+                            .into_string()
+                            .unwrap()
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -117,21 +159,21 @@ fn parse_chem(chem: &Chem) {
 
     if !vec.is_empty() {
         let f = Filter::new(cid, canonical_smiles, molecular_weight, vec);
-        info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
+        // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
+        let _ = f.save_db();
     }
 }
 
 pub fn start_parse(dir: &str) {
-    let mut vec: Vec<PathBuf> = Vec::with_capacity(100000);
+    let mut vec: Vec<String> = Vec::with_capacity(1000);
     get_json_files(dir, &mut vec);
 
-    vec.iter().for_each(|f| {
-        let str = f.clone().into_os_string().into_string().unwrap();
-        let result = parse_json(&str);
+    vec.into_par_iter().for_each(|f| {
+        let result = parse_json(&f);
         if let Ok(chem) = result {
             parse_chem(&chem);
         } else {
-            info!("{}, err = {:?}", str, result);
+            info!("{}, err = {:?}", f, result);
         }
     });
 }
@@ -143,7 +185,7 @@ mod tests {
     #[test]
     fn test_name() {
         crate::config::init_config();
-
+        crate::db::init_db("mongodb://192.168.2.25:27017");
         start_parse("data/1000000/3000");
     }
 }

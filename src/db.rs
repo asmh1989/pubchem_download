@@ -12,9 +12,11 @@ use serde::de::DeserializeOwned;
 
 static INSTANCE: OnceCell<Arc<Client>> = OnceCell::new();
 
-const TABLE_NAME: &'static str = "pub_chem_not_found";
-pub const COLLECTION_CID: &'static str = "cid";
-const KEY_UPDATE_TIME: &'static str = "update_time";
+const TABLE_NAME: &'static str = "pub_chem";
+pub const COLLECTION_CID_NOT_FOUND: &'static str = "cid_not_found";
+pub const COLLECTION_FILTER_SMILES_SOLUBILITY: &'static str = "filter_smiles_solubility";
+
+const KEY_UPDATE_TIME: &'static str = "updateTime";
 
 #[macro_export]
 macro_rules! filter_cid {
@@ -162,10 +164,10 @@ mod tests {
         //     .sort(doc! { "create_time": -1 })
         //     .build();
 
-        assert!(Db::contians(COLLECTION_CID, filter_cid!("test")));
+        assert!(Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!("test")));
 
-        assert!(Db::delete(COLLECTION_CID, filter_cid!("test")).is_ok());
+        assert!(Db::delete(COLLECTION_CID_NOT_FOUND, filter_cid!("test")).is_ok());
 
-        assert!(!Db::contians(COLLECTION_CID, filter_cid!("test")));
+        assert!(!Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!("test")));
     }
 }
