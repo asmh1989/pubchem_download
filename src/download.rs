@@ -1,8 +1,15 @@
 use log::info;
+use mongodb::bson;
 use once_cell::sync::OnceCell;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reqwest::header::{self, HeaderValue};
 use std::{cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt};
+
+use crate::{
+    db::{Db, COLLECTION_CID},
+    filter_cid,
+    model::PubChemNotFound,
+};
 
 static HEADERS: OnceCell<header::HeaderMap> = OnceCell::new();
 
@@ -40,7 +47,8 @@ pub fn init_header() {
     let _ = HEADERS.set(headers);
 }
 
-fn fetch_url(url: String, file_name: String) -> Result<(), String> {
+fn fetch_url(f: usize, file_name: String) -> Result<(), String> {
+    let url = get_url(f);
     let path = std::path::Path::new(&file_name);
     let prefix = path.parent().unwrap();
     std::fs::create_dir_all(prefix).unwrap();
@@ -55,7 +63,14 @@ fn fetch_url(url: String, file_name: String) -> Result<(), String> {
         .send()
         .map_err(|e| e.to_string())?;
     if !response.status().is_success() {
-        return Err("请求失败!".to_string());
+        let code = response.status().as_u16();
+
+        if code == 404 {
+            let d = PubChemNotFound::new(&f.to_string());
+            let _ = d.save_db();
+        }
+
+        return Err(format!("请求失败! code = {}", response.status()));
     }
     let mut file = std::fs::File::create(file_name).map_err(|e| e.to_string())?;
     let bytes = response.bytes().map_err(|e| e.to_string())?;
@@ -99,30 +114,53 @@ pub fn file_exist(path: &str) -> bool {
     }
 }
 
+#[inline]
+fn get_url(f: usize) -> String {
+    format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
+}
+
+fn get_chem(f: usize) {
+    let path = format!("data/{}", get_path_by_id(f as usize));
+
+    if !file_exist(&path) {
+        info!("start download id = {}, path = {}", f, path);
+        let result = fetch_url(f, path);
+        if result.is_err() {
+            info!("id = {}, result = {:?}", f, result);
+        }
+    } else {
+        // info!("already download {}", f);
+    }
+}
+
 pub fn download_chems(start: usize) {
     init_header();
     let step = 1000000;
-    (max(1, start * step)..(start + 1) * step).into_par_iter().for_each(|f| {
-        let path = format!("data/{}", get_path_by_id(f as usize));
-        let url = format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f);
-
-        if !file_exist(&path) {
-            info!("start download id = {}, path = {}", f, path);
-            let result = fetch_url(url, path);
-            if result.is_err() {
-                info!("id = {}, result = {:?}", f, result);
+    (max(1, start * step)..(start + 1) * step)
+        .into_par_iter()
+        .for_each(|f| {
+            if !Db::contians(COLLECTION_CID, filter_cid!(&f.to_string())) {
+                get_chem(f);
+            } else {
+                // info!("cid = {} is 404 not found, not need download again!", f);
             }
-        } else {
-            // info!("already download {}", f);
-        }
-
-
-    });
+        });
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::db;
+
     use super::*;
+
+    fn init() {
+        db::init_db("mongodb://192.168.2.25:27017");
+        crate::config::init_config();
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build_global()
+            .unwrap();
+    }
 
     #[test]
     fn test_file_exist() {
@@ -147,7 +185,13 @@ mod tests {
 
     #[test]
     fn test_download() {
-        crate::config::init_config();
+        init();
         download_chems(0);
+    }
+
+    #[test]
+    fn test_download_not_found() {
+        init();
+        get_chem(25928);
     }
 }

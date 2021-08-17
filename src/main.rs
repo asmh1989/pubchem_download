@@ -5,11 +5,14 @@ use std::env::args;
 use log::info;
 
 mod config;
+mod db;
 mod download;
+mod model;
 
 fn main() {
     // println!("Hello, world!");
     crate::config::init_config();
+    db::init_db("mongodb://192.168.2.25:27017");
 
     let args: Vec<String> = args().collect();
     let mut start: usize = 0;
