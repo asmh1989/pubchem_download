@@ -129,6 +129,9 @@ impl Db {
 }
 
 pub fn init_db(url: &str) {
+    if INSTANCE.get().is_some() {
+        return;
+    }
     let mut client_options = ClientOptions::parse(url).unwrap();
     client_options.connect_timeout = Some(Duration::new(4, 0));
     // 选择超时

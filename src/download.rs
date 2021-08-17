@@ -6,7 +6,7 @@ use reqwest::header::{self, HeaderValue};
 use std::{cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt};
 
 use crate::{
-    db::{Db, COLLECTION_CID},
+    db::{init_db, Db, COLLECTION_CID},
     filter_cid,
     model::PubChemNotFound,
 };
@@ -47,7 +47,7 @@ pub fn init_header() {
     let _ = HEADERS.set(headers);
 }
 
-fn fetch_url(f: usize, file_name: String) -> Result<(), String> {
+fn fetch_url(f: usize, file_name: String, usb_db: bool) -> Result<(), String> {
     let url = get_url(f);
     let path = std::path::Path::new(&file_name);
     let prefix = path.parent().unwrap();
@@ -65,7 +65,7 @@ fn fetch_url(f: usize, file_name: String) -> Result<(), String> {
     if !response.status().is_success() {
         let code = response.status().as_u16();
 
-        if code == 404 {
+        if code == 404 && usb_db {
             let d = PubChemNotFound::new(&f.to_string());
             let _ = d.save_db();
         }
@@ -119,12 +119,12 @@ fn get_url(f: usize) -> String {
     format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
 }
 
-fn get_chem(f: usize) {
+fn get_chem(f: usize, usb_db: bool) {
     let path = format!("data/{}", get_path_by_id(f as usize));
 
     if !file_exist(&path) {
         info!("start download id = {}, path = {}", f, path);
-        let result = fetch_url(f, path);
+        let result = fetch_url(f, path, usb_db);
         if result.is_err() {
             info!("id = {}, result = {:?}", f, result);
         }
@@ -133,14 +133,18 @@ fn get_chem(f: usize) {
     }
 }
 
-pub fn download_chems(start: usize) {
+pub fn download_chems(start: usize, use_db: bool) {
+    if use_db {
+        init_db("mongodb://192.168.2.25:27017");
+    }
+
     init_header();
     let step = 1000000;
     (max(1, start * step)..(start + 1) * step)
         .into_par_iter()
         .for_each(|f| {
-            if !Db::contians(COLLECTION_CID, filter_cid!(&f.to_string())) {
-                get_chem(f);
+            if !use_db || !Db::contians(COLLECTION_CID, filter_cid!(&f.to_string())) {
+                get_chem(f, use_db);
             } else {
                 // info!("cid = {} is 404 not found, not need download again!", f);
             }
@@ -186,12 +190,12 @@ mod tests {
     #[test]
     fn test_download() {
         init();
-        download_chems(0);
+        download_chems(0, true);
     }
 
     #[test]
     fn test_download_not_found() {
         init();
-        get_chem(25928);
+        get_chem(25928, true);
     }
 }
