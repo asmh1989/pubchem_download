@@ -27,6 +27,9 @@ pub struct Opt {
     )]
     pub enable_filter: bool,
 
+    #[structopt(long = "no-update", help = "过滤任务时, 不去更新已在数据库中的数据")]
+    pub no_update: bool,
+
     #[structopt(
         long = "filter-name",
         short = "n",

@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,8 +159,9 @@ pub struct Reference {
 }
 
 pub fn parse_json(file: &str) -> Result<Chem, String> {
-    let file = File::open(file).map_err(|f| f.to_string())?;
-    let json: Chem = serde_json::from_reader(file).map_err(|f| f.to_string())?;
+    let file = std::fs::read(file).map_err(|f| f.to_string())?;
+    let str = unsafe { String::from_utf8_unchecked(file) };
+    let json: Chem = serde_json::from_str(&str).map_err(|f| f.to_string())?;
 
     Ok(json)
 }
@@ -181,6 +180,20 @@ mod tests {
         let json = parse_json(file);
 
         info!("json = {:?}", json);
+    }
+
+    #[test]
+    fn test_unicode() {
+        crate::config::init_config();
+
+        let file = "data/1000000/16000/15938.json";
+
+        let json = parse_json(file);
+
+        info!(
+            "json = {}",
+            serde_json::to_string_pretty(&json.unwrap()).unwrap()
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use std::{fs, os::linux::fs::MetadataExt, path::PathBuf};
+use std::{fs, os::linux::fs::MetadataExt};
 
 use log::info;
 use mongodb::bson::{self, doc};
@@ -178,35 +178,35 @@ fn parse_chem(chem: &Chem) {
     }
 }
 
-pub fn start_parse(dir: &str) {
+pub fn start_parse(dir: &str, no_update: bool) {
     let mut vec: Vec<String> = Vec::with_capacity(1000);
     get_json_files(dir, &mut vec);
 
     info!("path in dir : {}, found json files : {}", dir, vec.len());
 
     vec.into_par_iter().for_each(|f| {
-        // let name = PathBuf::from(&f)
-        //     .file_stem()
-        //     .unwrap()
-        //     .to_os_string()
-        //     .into_string()
-        //     .unwrap();
-        // if !contains(&name.clone()) {
-        let result = parse_json(&f);
-        if let Ok(chem) = result {
-            parse_chem(&chem);
+        let name = std::path::PathBuf::from(&f)
+            .file_stem()
+            .unwrap()
+            .to_os_string()
+            .into_string()
+            .unwrap();
+        if !no_update || !contains(&name.clone()) {
+            let result = parse_json(&f);
+            if let Ok(chem) = result {
+                parse_chem(&chem);
+            } else {
+                info!("{}, err = {:?}", f, result);
+            }
         } else {
-            info!("{}, err = {:?}", f, result);
+            info!("cid = {}, already in db", name);
         }
-        // } else {
-        //     info!("cid = {}, already in db", name);
-        // }
     });
 }
 
-pub fn start_filter(name: &str, data: &str) {
+pub fn start_filter(name: &str, data: &str, no_update: bool) {
     match name {
-        _ => start_parse(data),
+        _ => start_parse(data, no_update),
     }
 }
 
@@ -233,6 +233,6 @@ mod tests {
             .build_global()
             .unwrap();
 
-        start_parse("data/");
+        start_parse("data/1000000/1000", false);
     }
 }

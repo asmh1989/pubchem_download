@@ -1,14 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
 use log::info;
+
 use mongodb::{
-    bson::{self, doc, Bson, DateTime, Document},
+    bson::{doc, Bson, DateTime, Document},
     error::Error,
-    options::{ClientOptions, FindOneOptions, FindOptions},
+    options::{ClientOptions, FindOneOptions},
     sync::Client,
 };
 use once_cell::sync::OnceCell;
-use serde::de::DeserializeOwned;
 
 static INSTANCE: OnceCell<Arc<Client>> = OnceCell::new();
 
@@ -22,7 +22,7 @@ const KEY_CREATE_TIME: &'static str = "createTime";
 #[macro_export]
 macro_rules! filter_cid {
     ($e:expr) => {
-        bson::doc! {"cid" : $e}
+        mongodb::bson::doc! {"cid" : $e}
     };
 }
 
@@ -34,42 +34,42 @@ impl Db {
         INSTANCE.get().expect("db need init first")
     }
 
-    pub fn find<T>(
-        table: &str,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-        call_back: &dyn Fn(T),
-    ) -> Result<(), Error>
-    where
-        T: DeserializeOwned,
-    {
-        let client = Db::get_instance();
-        let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+    // pub fn find<T>(
+    //     table: &str,
+    //     filter: impl Into<Option<Document>>,
+    //     options: impl Into<Option<FindOptions>>,
+    //     call_back: &dyn Fn(T),
+    // ) -> Result<(), Error>
+    // where
+    //     T: DeserializeOwned,
+    // {
+    //     let client = Db::get_instance();
+    //     let db = client.database(TABLE_NAME);
+    //     let collection = db.collection::<Document>(table);
 
-        let mut cursor = collection.find(filter, options)?;
+    //     let mut cursor = collection.find(filter, options)?;
 
-        // Iterate over the results of the cursor.
-        while let Some(result) = cursor.next() {
-            match result {
-                Ok(document) => {
-                    let result = bson::from_bson::<T>(Bson::Document(document));
-                    match result {
-                        Ok(app) => call_back(app),
-                        Err(err) => {
-                            info!("err = {:?}", err);
-                        }
-                    }
-                }
-                Err(e) => {
-                    info!("error = {:?}", e);
-                    return Err(e.into());
-                }
-            }
-        }
+    //     // Iterate over the results of the cursor.
+    //     while let Some(result) = cursor.next() {
+    //         match result {
+    //             Ok(document) => {
+    //                 let result = bson::from_bson::<T>(Bson::Document(document));
+    //                 match result {
+    //                     Ok(app) => call_back(app),
+    //                     Err(err) => {
+    //                         info!("err = {:?}", err);
+    //                     }
+    //                 }
+    //             }
+    //             Err(e) => {
+    //                 info!("error = {:?}", e);
+    //                 return Err(e.into());
+    //             }
+    //         }
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub fn find_one(
         table: &str,
@@ -78,7 +78,7 @@ impl Db {
     ) -> Result<Option<Document>, Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
 
         collection.find_one(filter, options)
     }
@@ -86,7 +86,7 @@ impl Db {
     pub fn save(table: &str, filter: Document, app: Document) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
 
         let mut update_doc = app;
         let date = Bson::DateTime(DateTime::now());
