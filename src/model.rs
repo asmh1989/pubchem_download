@@ -1,4 +1,3 @@
-use bson::DateTime;
 use log::info;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
@@ -9,23 +8,17 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PubChemNotFound {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     id: Option<bson::oid::ObjectId>,
     pub cid: String,
-    // #[serde(serialize_with = "bson_datetime_as_iso_string")]
-    pub create_time: DateTime,
-    pub update_time: DateTime,
 }
 
 impl PubChemNotFound {
     pub fn new(cid: &str) -> Self {
-        let date = DateTime::now();
-
         Self {
             cid: cid.to_string(),
-            create_time: date.clone(),
-            update_time: date,
             id: None,
         }
     }

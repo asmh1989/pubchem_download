@@ -1,7 +1,7 @@
 use std::fs;
 
 use log::info;
-use mongodb::bson::{self, DateTime};
+use mongodb::bson;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +20,6 @@ pub struct Filter {
     pub smiles: String,
     pub molecular_weight: String,
     pub solubility: Vec<String>,
-    pub create_time: DateTime,
-    pub update_time: DateTime,
 }
 
 impl Filter {
@@ -31,16 +29,12 @@ impl Filter {
         molecular_weight: String,
         solubility: Vec<String>,
     ) -> Self {
-        let date = DateTime::now();
-
         Self {
             id: None,
             cid,
             smiles,
             molecular_weight,
             solubility,
-            create_time: date.clone(),
-            update_time: date,
         }
     }
 
@@ -58,8 +52,8 @@ impl Filter {
             filter_cid!(self.cid.clone()),
             doc.clone(),
         ) {
-            info!("db save error{} ", e);
-            return Err(format!("db save error{} ", e));
+            info!("db save error {} ", e);
+            return Err(format!("db save error {} ", e));
         }
         Ok(())
     }
@@ -168,6 +162,8 @@ pub fn start_parse(dir: &str) {
     let mut vec: Vec<String> = Vec::with_capacity(1000);
     get_json_files(dir, &mut vec);
 
+    info!("path in dir : {}, found json files : {}", dir, vec.len());
+
     vec.into_par_iter().for_each(|f| {
         let result = parse_json(&f);
         if let Ok(chem) = result {
@@ -186,6 +182,6 @@ mod tests {
     fn test_name() {
         crate::config::init_config();
         crate::db::init_db("mongodb://192.168.2.25:27017");
-        start_parse("data/1000000/3000");
+        start_parse("data/2000000");
     }
 }

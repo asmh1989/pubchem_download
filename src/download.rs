@@ -169,10 +169,6 @@ mod tests {
     #[test]
     fn test_file_exist() {
         crate::config::init_config();
-        let meta = fs::metadata("data/test");
-        assert!(meta.is_ok());
-
-        assert!(meta.unwrap().is_file());
 
         let meta = fs::metadata("data/1000000/1000/1.json");
 

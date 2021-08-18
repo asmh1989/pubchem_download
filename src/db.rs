@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use log::info;
 use mongodb::{
-    bson::{self, Bson, DateTime, Document},
+    bson::{self, doc, Bson, DateTime, Document},
     error::Error,
     options::{ClientOptions, FindOneOptions, FindOptions},
     sync::Client,
@@ -17,6 +17,7 @@ pub const COLLECTION_CID_NOT_FOUND: &'static str = "cid_not_found";
 pub const COLLECTION_FILTER_SMILES_SOLUBILITY: &'static str = "filter_smiles_solubility";
 
 const KEY_UPDATE_TIME: &'static str = "updateTime";
+const KEY_CREATE_TIME: &'static str = "createTime";
 
 #[macro_export]
 macro_rules! filter_cid {
@@ -88,14 +89,16 @@ impl Db {
         let collection = db.collection(table);
 
         let mut update_doc = app;
-        update_doc.insert(KEY_UPDATE_TIME, Bson::DateTime(DateTime::now()));
+        let date = Bson::DateTime(DateTime::now());
+        update_doc.insert(KEY_UPDATE_TIME, date.clone());
 
         let result = collection.find_one(filter.clone(), None)?;
 
         if let Some(_) = result {
             // info!("db update");
-            collection.update_one(filter.clone(), update_doc, None)?;
+            collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
+            update_doc.insert(KEY_CREATE_TIME, date);
             let result = collection.insert_one(update_doc, None)?;
 
             info!("db insert {:?}", result);
@@ -156,6 +159,8 @@ mod tests {
         super::init_db("mongodb://192.168.2.25:27017");
 
         let data = crate::model::PubChemNotFound::new("test");
+
+        assert!(data.save_db().is_ok());
 
         assert!(data.save_db().is_ok());
 
