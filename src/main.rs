@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
-use std::env::args;
-
 use log::info;
+use structopt::StructOpt;
 
+use crate::{args::Opt, filter::start_filter};
+
+mod args;
 mod chem;
 mod config;
 mod db;
@@ -13,29 +15,79 @@ mod model;
 
 fn main() {
     // println!("Hello, world!");
-    crate::config::init_config();
-    let args: Vec<String> = args().collect();
-    let mut start: usize = 0;
-    if args.len() > 1 {
-        start = args.get(1).unwrap().parse::<usize>().unwrap();
+
+    const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+    let mut opt: Opt = Opt::from_args();
+
+    // 打印版本
+    if opt.version {
+        println!("{}", VERSION);
+        return;
     }
 
-    let mut threads = 1;
+    config::Config::get_instance();
 
-    if args.len() > 2 {
-        threads = args.get(2).unwrap().parse::<usize>().unwrap();
+    if !opt.enable_filter {
+        if opt.jobs > 12 {
+            opt.jobs = 12
+        }
     }
 
-    info!("start download = {}, threads = {}", start, threads);
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_enable_db(opt.enable_db);
 
-    if threads > 12 {
-        threads = 12;
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_enable_filter(opt.enable_filter);
+
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_sql(&opt.sql);
+
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_filter_name(&opt.filter_name);
+
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_jobs(opt.jobs);
+
+    config::Config::get_instance()
+        .lock()
+        .unwrap()
+        .set_download_start(opt.download_start);
+
+    info!("{:#?}", opt);
+
+    if opt.enable_db {
+        db::init_db(&format!("mongodb://{}", opt.sql));
     }
 
     rayon::ThreadPoolBuilder::new()
-        .num_threads(threads)
+        .num_threads(opt.jobs)
         .build_global()
         .unwrap();
 
-    download::download_chems(start, false);
+    if opt.enable_filter {
+        info!(
+            "start filter data , path = {}, threads = {}",
+            opt.data_path, opt.jobs
+        );
+
+        start_filter(&opt.filter_name, &opt.data_path);
+    } else {
+        info!(
+            "start download = {}, threads = {}",
+            opt.download_start, opt.jobs
+        );
+
+        download::download_chems(opt.download_start, opt.enable_db);
+    }
 }

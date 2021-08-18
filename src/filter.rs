@@ -1,4 +1,7 @@
-use std::fs;
+use std::{
+    fs::{self},
+    os::linux::fs::MetadataExt,
+};
 
 use log::info;
 use mongodb::bson;
@@ -70,13 +73,23 @@ pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
             } else if let Some(k) = p.extension() {
                 if k == "json" {
                     // info!("found json file : {:?}", p);
-                    vec.push(
-                        p.clone()
-                            .into_os_string()
-                            .into_string()
-                            .unwrap()
-                            .to_string(),
-                    );
+                    let m = p.metadata().unwrap();
+                    let path = p
+                        .clone()
+                        .into_os_string()
+                        .into_string()
+                        .unwrap()
+                        .to_string();
+                    if m.st_size() > 1024 {
+                        vec.push(path);
+                    } else {
+                        info!(
+                            "remove file = {}, becase size = {} ",
+                            path.clone(),
+                            m.st_size()
+                        );
+                        let _ = fs::remove_file(path);
+                    }
                 }
             }
         }
@@ -125,13 +138,15 @@ fn parse_chem(chem: &Chem) {
                                 s3.information.iter().for_each(|f| {
                                     if !f.value.string_with_markup.is_empty() {
                                         vec.push(f.value.string_with_markup[0].string.clone());
-                                    } else {
-                                        return;
                                     }
                                 });
                             }
                             _ => {}
                         });
+
+                        if vec.is_empty() {
+                            return;
+                        }
                     }
                     "Computed Properties" => {
                         s2.section.iter().for_each(|s3| match &s3.tocheading[..] {
@@ -174,6 +189,12 @@ pub fn start_parse(dir: &str) {
     });
 }
 
+pub fn start_filter(name: &str, data: &str) {
+    match name {
+        _ => start_parse(data),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,6 +203,12 @@ mod tests {
     fn test_name() {
         crate::config::init_config();
         crate::db::init_db("mongodb://192.168.2.25:27017");
-        start_parse("data/2000000");
+
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(24)
+            .build_global()
+            .unwrap();
+
+        start_parse("data/");
     }
 }

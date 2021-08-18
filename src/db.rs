@@ -96,7 +96,7 @@ impl Db {
 
         if let Some(_) = result {
             // info!("db update");
-            collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
+            // collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
             update_doc.insert(KEY_CREATE_TIME, date);
             let result = collection.insert_one(update_doc, None)?;
