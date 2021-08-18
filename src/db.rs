@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use log::info;
 
 use mongodb::{
-    bson::{doc, Bson, DateTime, Document},
+    bson::{doc, Bson, Document},
     error::Error,
     options::{ClientOptions, FindOneOptions},
     sync::Client,
@@ -78,7 +78,7 @@ impl Db {
     ) -> Result<Option<Document>, Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection::<Document>(table);
+        let collection = db.collection(table);
 
         collection.find_one(filter, options)
     }
@@ -86,10 +86,10 @@ impl Db {
     pub fn save(table: &str, filter: Document, app: Document) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection::<Document>(table);
+        let collection = db.collection(table);
 
         let mut update_doc = app;
-        let date = Bson::DateTime(DateTime::now());
+        let date = Bson::DateTime(chrono::Utc::now());
         update_doc.insert(KEY_UPDATE_TIME, date.clone());
 
         let result = collection.find_one(filter.clone(), None)?;
@@ -110,7 +110,7 @@ impl Db {
     pub fn delete(table: &str, filter: Document) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection::<Document>(table);
+        let collection = db.collection(table);
 
         let result = collection.delete_one(filter, None)?;
 
@@ -122,7 +122,7 @@ impl Db {
     pub fn contians(table: &str, filter: Document) -> bool {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection::<Document>(table);
+        let collection = db.collection(table);
 
         let result = collection.find_one(filter, None);
 
