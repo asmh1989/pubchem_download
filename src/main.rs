@@ -32,6 +32,8 @@ fn main() {
         if opt.jobs > 12 {
             opt.jobs = 12
         }
+    } else {
+        opt.enable_db = true;
     }
 
     config::Config::get_instance()

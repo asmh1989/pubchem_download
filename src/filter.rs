@@ -1,10 +1,7 @@
-use std::{
-    fs::{self},
-    os::linux::fs::MetadataExt,
-};
+use std::{fs, os::linux::fs::MetadataExt, path::PathBuf};
 
 use log::info;
-use mongodb::bson;
+use mongodb::bson::{self, doc};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +18,7 @@ pub struct Filter {
     id: Option<bson::oid::ObjectId>,
     pub cid: i64,
     pub smiles: String,
+    pub inchi: String,
     pub molecular_weight: String,
     pub solubility: Vec<String>,
 }
@@ -30,6 +28,7 @@ impl Filter {
         cid: i64,
         smiles: String,
         molecular_weight: String,
+        inchi: String,
         solubility: Vec<String>,
     ) -> Self {
         Self {
@@ -38,6 +37,7 @@ impl Filter {
             smiles,
             molecular_weight,
             solubility,
+            inchi,
         }
     }
 
@@ -102,6 +102,7 @@ fn parse_chem(chem: &Chem) {
     let mut molecular_weight = "".to_string();
     let mut canonical_smiles = "".to_string();
     let mut isomeric_smiles = "".to_string();
+    let mut inchi = "".to_string();
     chem.record
         .section
         .iter()
@@ -122,6 +123,10 @@ fn parse_chem(chem: &Chem) {
                             }
                             "Isomeric SMILES" => {
                                 isomeric_smiles =
+                                    s3.information[0].value.string_with_markup[0].string.clone();
+                            }
+                            "InChI" => {
+                                inchi =
                                     s3.information[0].value.string_with_markup[0].string.clone();
                             }
                             _ => {}
@@ -167,7 +172,7 @@ fn parse_chem(chem: &Chem) {
         });
 
     if !vec.is_empty() {
-        let f = Filter::new(cid, canonical_smiles, molecular_weight, vec);
+        let f = Filter::new(cid, canonical_smiles, molecular_weight, inchi, vec);
         // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
         let _ = f.save_db();
     }
@@ -180,12 +185,22 @@ pub fn start_parse(dir: &str) {
     info!("path in dir : {}, found json files : {}", dir, vec.len());
 
     vec.into_par_iter().for_each(|f| {
+        // let name = PathBuf::from(&f)
+        //     .file_stem()
+        //     .unwrap()
+        //     .to_os_string()
+        //     .into_string()
+        //     .unwrap();
+        // if !contains(&name.clone()) {
         let result = parse_json(&f);
         if let Ok(chem) = result {
             parse_chem(&chem);
         } else {
             info!("{}, err = {:?}", f, result);
         }
+        // } else {
+        //     info!("cid = {}, already in db", name);
+        // }
     });
 }
 
@@ -193,6 +208,13 @@ pub fn start_filter(name: &str, data: &str) {
     match name {
         _ => start_parse(data),
     }
+}
+
+fn contains(cid: &str) -> bool {
+    Db::contians(
+        COLLECTION_FILTER_SMILES_SOLUBILITY,
+        doc! {"cid":cid.parse::<i64>().unwrap()},
+    )
 }
 
 #[cfg(test)]
@@ -203,6 +225,8 @@ mod tests {
     fn test_name() {
         crate::config::init_config();
         crate::db::init_db("mongodb://192.168.2.25:27017");
+
+        assert!(contains("2342"));
 
         rayon::ThreadPoolBuilder::new()
             .num_threads(24)
