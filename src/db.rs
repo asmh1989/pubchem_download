@@ -124,10 +124,10 @@ impl Db {
         let db = client.database(TABLE_NAME);
         let collection = db.collection(table);
 
-        let result = collection.find_one(filter, None);
+        let result = collection.count_documents(filter, None);
 
         match result {
-            Ok(d) => d.is_some(),
+            Ok(d) => d > 0,
             Err(_) => false,
         }
     }

@@ -77,6 +77,7 @@ fn main() {
         .build_global()
         .unwrap();
 
+    let start = chrono::Utc::now();
     if opt.enable_filter {
         info!(
             "start filter data , path = {}, threads = {}",
@@ -92,4 +93,8 @@ fn main() {
 
         download::download_chems(opt.download_start, opt.enable_db);
     }
+
+    let time = chrono::Utc::now() - start;
+
+    info!("finish, time: {} ", time);
 }
