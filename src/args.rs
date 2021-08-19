@@ -15,7 +15,7 @@ pub struct Opt {
     #[structopt(
         long = "block",
         short = "b",
-        help = "下载任务起始cid",
+        help = "下载任务起始cid, 按1000000份为一块",
         default_value = "0"
     )]
     pub download_start: usize,
