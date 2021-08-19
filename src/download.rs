@@ -72,12 +72,12 @@ fn fetch_url(f: usize, file_name: String, usb_db: bool) -> Result<(), String> {
 
         return Err(format!("请求失败! code = {}", response.status()));
     }
-    let mut file = std::fs::File::create(file_name).map_err(|e| e.to_string())?;
     let bytes = response.bytes().map_err(|e| e.to_string())?;
     if bytes.len() < 1024 {
         return Err("文件大小不对".to_string());
     }
     let mut content = Cursor::new(bytes);
+    let mut file = std::fs::File::create(file_name).map_err(|e| e.to_string())?;
     std::io::copy(&mut content, &mut file).map_err(|e| e.to_string())?;
     Ok(())
 }
