@@ -3,18 +3,20 @@ use std::{sync::Arc, time::Duration};
 use log::info;
 
 use mongodb::{
-    bson::{doc, Bson, Document},
+    bson::{self, doc, Bson, Document},
     error::Error,
-    options::{ClientOptions, FindOneOptions},
+    options::{ClientOptions, FindOneOptions, FindOptions},
     sync::Client,
 };
 use once_cell::sync::OnceCell;
+use serde::de::DeserializeOwned;
 
 static INSTANCE: OnceCell<Arc<Client>> = OnceCell::new();
 
 const TABLE_NAME: &'static str = "pub_chem";
 pub const COLLECTION_CID_NOT_FOUND: &'static str = "cid_not_found";
 pub const COLLECTION_FILTER_SMILES_SOLUBILITY: &'static str = "filter_smiles_solubility";
+pub const COLLECTION_FILTER_WATER_SOLUBILITY: &'static str = "filter_water_solubility";
 
 const KEY_UPDATE_TIME: &'static str = "updateTime";
 const KEY_CREATE_TIME: &'static str = "createTime";
@@ -34,42 +36,42 @@ impl Db {
         INSTANCE.get().expect("db need init first")
     }
 
-    // pub fn find<T>(
-    //     table: &str,
-    //     filter: impl Into<Option<Document>>,
-    //     options: impl Into<Option<FindOptions>>,
-    //     call_back: &dyn Fn(T),
-    // ) -> Result<(), Error>
-    // where
-    //     T: DeserializeOwned,
-    // {
-    //     let client = Db::get_instance();
-    //     let db = client.database(TABLE_NAME);
-    //     let collection = db.collection::<Document>(table);
+    pub fn find<T>(
+        table: &str,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOptions>>,
+        call_back: &dyn Fn(T),
+    ) -> Result<(), Error>
+    where
+        T: DeserializeOwned,
+    {
+        let client = Db::get_instance();
+        let db = client.database(TABLE_NAME);
+        let collection = db.collection(table);
 
-    //     let mut cursor = collection.find(filter, options)?;
+        let mut cursor = collection.find(filter, options)?;
 
-    //     // Iterate over the results of the cursor.
-    //     while let Some(result) = cursor.next() {
-    //         match result {
-    //             Ok(document) => {
-    //                 let result = bson::from_bson::<T>(Bson::Document(document));
-    //                 match result {
-    //                     Ok(app) => call_back(app),
-    //                     Err(err) => {
-    //                         info!("err = {:?}", err);
-    //                     }
-    //                 }
-    //             }
-    //             Err(e) => {
-    //                 info!("error = {:?}", e);
-    //                 return Err(e.into());
-    //             }
-    //         }
-    //     }
+        // Iterate over the results of the cursor.
+        while let Some(result) = cursor.next() {
+            match result {
+                Ok(document) => {
+                    let result = bson::from_bson::<T>(Bson::Document(document));
+                    match result {
+                        Ok(app) => call_back(app),
+                        Err(err) => {
+                            info!("err = {:?}", err);
+                        }
+                    }
+                }
+                Err(e) => {
+                    info!("error = {:?}", e);
+                    return Err(e.into());
+                }
+            }
+        }
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     pub fn find_one(
         table: &str,
@@ -129,6 +131,19 @@ impl Db {
         match result {
             Ok(d) => d > 0,
             Err(_) => false,
+        }
+    }
+
+    pub fn count(table: &str, filter: Document) -> i64 {
+        let client = Db::get_instance();
+        let db = client.database(TABLE_NAME);
+        let collection = db.collection(table);
+
+        let result = collection.count_documents(filter, None);
+
+        match result {
+            Ok(d) => d,
+            Err(_) => 0,
         }
     }
 }

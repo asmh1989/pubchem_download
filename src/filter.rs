@@ -1,13 +1,22 @@
-use std::{fs, os::linux::fs::MetadataExt};
+use std::{
+    fs::{self, File},
+    io::BufWriter,
+    os::linux::fs::MetadataExt,
+    sync::Mutex,
+};
 
 use log::info;
-use mongodb::bson::{self, doc};
+use mongodb::{
+    bson::{self, doc},
+    options::FindOptions,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     chem::{parse_json, Chem},
-    db::{Db, COLLECTION_FILTER_SMILES_SOLUBILITY},
+    db::{Db, COLLECTION_FILTER_SMILES_SOLUBILITY, COLLECTION_FILTER_WATER_SOLUBILITY},
     filter_cid,
 };
 
@@ -217,6 +226,146 @@ fn contains(cid: &str) -> bool {
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterWater {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    id: Option<bson::oid::ObjectId>,
+    pub cid: i64,
+    pub smiles: String,
+    pub inchi: String,
+    pub molecular_weight: String,
+    pub solubility: String,
+    pub value: String,
+}
+
+impl FilterWater {
+    pub fn new(
+        cid: i64,
+        smiles: String,
+        molecular_weight: String,
+        inchi: String,
+        solubility: String,
+        value: String,
+    ) -> Self {
+        Self {
+            id: None,
+            cid,
+            smiles,
+            molecular_weight,
+            solubility,
+            inchi,
+            value,
+        }
+    }
+
+    pub fn save_db(&self) -> Result<(), String> {
+        let doc = match bson::to_bson(&self) {
+            Ok(d) => d.as_document().unwrap().clone(),
+            Err(e) => {
+                info!("to_bson err {}", e);
+                return Err(format!("to_bson error : {}", e));
+            }
+        };
+
+        if let Err(e) = Db::save(
+            COLLECTION_FILTER_WATER_SOLUBILITY,
+            filter_cid!(self.cid.clone()),
+            doc.clone(),
+        ) {
+            info!("db save error {} ", e);
+            return Err(format!("db save error {} ", e));
+        }
+        Ok(())
+    }
+}
+
+fn find_water_solbility() {
+    let find_options = FindOptions::builder()
+        .projection(doc! {"cid": 1, "smiles": 1, "molecularWeight": 1, "solubility": 1, "inchi": 1})
+        .build();
+
+    let re = Regex::new(r"([0-9][0-9X.+\-,]{0,})").unwrap();
+    let re2 = Regex::new(r"([m]?[gG/01 ]{2,}[m]?[l|L])").unwrap();
+
+    let writer = BufWriter::new(File::create("data/output.csv").unwrap());
+
+    let wtr = Mutex::new(csv::Writer::from_writer(writer));
+
+    {
+        // We still need to write headers manually.
+        wtr.lock()
+            .unwrap()
+            .write_record(&[
+                "cid",
+                "smiles",
+                "inchi",
+                "molecularWeight",
+                "solubility",
+                "value",
+            ])
+            .unwrap();
+    }
+
+    let _ = Db::find(
+        COLLECTION_FILTER_SMILES_SOLUBILITY,
+        doc! {"$expr":{"$gte":[{"$size":"$solubility"},1]}},
+        find_options,
+        &|f: Filter| {
+            // info!("find filter = {:?}", f);
+            f.solubility.iter().for_each(|s| {
+                if s.to_lowercase().contains("water")
+                    && s.contains("25")
+                    && s.contains("°C")
+                    && re2.is_match(&s)
+                {
+                    let mut v = "".to_string();
+                    let mut u = "".to_string();
+
+                    if let Some(t) = re2.captures(&s) {
+                        u = t.get(1).unwrap().as_str().to_string();
+                    }
+
+                    let s2 = s.replace(&u, "").replace("25 °C", "");
+
+                    if let Some(t) = re.captures(&s2) {
+                        v = t.get(1).unwrap().as_str().to_string();
+                    }
+
+                    if v.is_empty() || u.is_empty() {
+                        v.clear();
+                        u.clear();
+                    }
+
+                    // let water = FilterWater::new(
+                    //     f.cid,
+                    //     f.smiles.clone(),
+                    //     f.molecular_weight.clone(),
+                    //     f.inchi.clone(),
+                    //     s.clone(),
+                    //     format!("{} {}", v, u),
+                    // );
+                    // let _ = water.save_db();
+
+                    wtr.lock()
+                        .unwrap()
+                        .serialize((
+                            f.cid,
+                            f.smiles.clone(),
+                            f.molecular_weight.clone(),
+                            f.inchi.clone(),
+                            s.clone(),
+                            format!("{} {}", v, u),
+                        ))
+                        .unwrap();
+                }
+            });
+        },
+    );
+
+    wtr.lock().unwrap().flush().unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +383,44 @@ mod tests {
             .unwrap();
 
         start_parse("data/1000000/1000", false);
+    }
+
+    #[test]
+    fn test_find_water() {
+        crate::config::init_config();
+        crate::db::init_db("mongodb://192.168.2.25:27017");
+
+        assert_eq!(
+            Db::count(
+                COLLECTION_FILTER_SMILES_SOLUBILITY,
+                doc! {"$expr":{"$gt":[{"$size":"$solubility"},1]}},
+            ),
+            6328
+        );
+
+        find_water_solbility();
+    }
+
+    #[test]
+    fn test_regex() {
+        let re = Regex::new(r"([0-9][0-9X.+\-,]{0,})").unwrap();
+
+        assert_eq!(
+            "7.48X10-7",
+            re.captures("In water, 7.48X10-7 mg/L at 25 °C (est)")
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+        );
+
+        assert_eq!(
+            "1",
+            re.captures("In water, 1 mg/L at 25 掳C")
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+        );
     }
 }

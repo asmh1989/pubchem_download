@@ -6,7 +6,7 @@ use reqwest::header::{self, HeaderValue};
 use std::{cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt};
 
 use crate::{
-    db::{init_db, Db, COLLECTION_CID_NOT_FOUND},
+    db::{Db, COLLECTION_CID_NOT_FOUND},
     filter_cid,
     model::PubChemNotFound,
 };
@@ -119,14 +119,16 @@ fn get_url(f: usize) -> String {
     format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
 }
 
-fn get_chem(f: usize, usb_db: bool) {
+fn get_chem(f: usize, use_db: bool) {
     let path = format!("data/{}", get_path_by_id(f as usize));
 
     if !file_exist(&path) {
         info!("start download id = {}, path = {}", f, path);
-        let result = fetch_url(f, path, usb_db);
-        if result.is_err() {
-            info!("id = {}, result = {:?}", f, result);
+        if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
+            let result = fetch_url(f, path, use_db);
+            if result.is_err() {
+                info!("id = {}, result = {:?}", f, result);
+            }
         }
     } else {
         // info!("already download {}", f);
@@ -134,20 +136,12 @@ fn get_chem(f: usize, usb_db: bool) {
 }
 
 pub fn download_chems(start: usize, use_db: bool) {
-    if use_db {
-        init_db("mongodb://192.168.2.25:27017");
-    }
-
     init_header();
     let step = 1000000;
     (max(1, start * step)..(start + 1) * step)
         .into_par_iter()
         .for_each(|f| {
-            if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
-                get_chem(f, use_db);
-            } else {
-                // info!("cid = {} is 404 not found, not need download again!", f);
-            }
+            get_chem(f, use_db);
         });
 }
 
