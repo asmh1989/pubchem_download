@@ -123,8 +123,8 @@ fn get_chem(f: usize, use_db: bool) {
     let path = format!("data/{}", get_path_by_id(f as usize));
 
     if !file_exist(&path) {
-        info!("start download id = {}, path = {}", f, path);
         if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
+            info!("start download id = {}, path = {}", f, path);
             let result = fetch_url(f, path, use_db);
             if result.is_err() {
                 info!("id = {}, result = {:?}", f, result);

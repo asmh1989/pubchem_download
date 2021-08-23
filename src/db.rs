@@ -94,9 +94,9 @@ impl Db {
         let date = Bson::DateTime(chrono::Utc::now());
         update_doc.insert(KEY_UPDATE_TIME, date.clone());
 
-        let result = collection.find_one(filter.clone(), None)?;
+        let result = collection.count_documents(filter.clone(), None)?;
 
-        if let Some(_) = result {
+        if result > 0 {
             // info!("db update");
             collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
