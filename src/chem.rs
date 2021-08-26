@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Chem {
     #[serde(rename = "Record")]
     pub record: Record,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
     #[serde(rename = "RecordType")]
@@ -22,7 +22,7 @@ pub struct Record {
     // pub reference: Vec<Reference>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Section {
     #[serde(rename = "TOCHeading")]
@@ -41,7 +41,7 @@ pub struct Section {
     // pub display_controls: Option<DisplayControls>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Information {
     #[serde(rename = "ReferenceNumber")]
@@ -59,7 +59,7 @@ pub struct Information {
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Value {
     #[serde(rename = "StringWithMarkup")]
@@ -81,7 +81,7 @@ pub struct Value {
     pub external_table_num_rows: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StringWithMarkup {
     #[serde(rename = "String")]
@@ -91,7 +91,7 @@ pub struct StringWithMarkup {
     pub markup: Vec<Markup>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Markup {
     #[serde(rename = "Start")]
@@ -106,7 +106,7 @@ pub struct Markup {
     pub extra: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayControls {
     #[serde(rename = "CreateTable")]
@@ -121,7 +121,7 @@ pub struct DisplayControls {
     pub hide_this_section: Option<bool>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTable {
     #[serde(rename = "FromInformationIn")]
@@ -133,7 +133,7 @@ pub struct CreateTable {
     pub column_contents: Vec<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reference {
     #[serde(rename = "ReferenceNumber")]
@@ -194,6 +194,15 @@ mod tests {
             "json = {}",
             serde_json::to_string_pretty(&json.unwrap()).unwrap()
         );
+    }
+
+    #[test]
+    fn test_json_faster() {
+        crate::config::init_config();
+        let file = "data/1000000/1000/1.json";
+        info!("start...");
+        let _json = parse_json(file);
+        info!("end ...");
     }
 
     #[test]

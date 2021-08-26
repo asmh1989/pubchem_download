@@ -7,7 +7,7 @@ use std::{
 
 use log::info;
 use mongodb::{
-    bson::{self, doc},
+    bson::{self, doc, Document},
     options::FindOptions,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -19,6 +19,8 @@ use crate::{
     db::{Db, COLLECTION_FILTER_SMILES_SOLUBILITY, COLLECTION_FILTER_WATER_SOLUBILITY},
     filter_cid,
 };
+
+const BUFFER_SIZE: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +58,16 @@ impl Filter {
         }
     }
 
+    pub fn document(&self) -> Result<Document, String> {
+        match bson::to_bson(&self) {
+            Ok(d) => return Ok(d.as_document().unwrap().clone()),
+            Err(e) => {
+                info!("to_bson err {}", e);
+                return Err(format!("to_bson error : {}", e));
+            }
+        };
+    }
+
     pub fn save_db(&self) -> Result<(), String> {
         let doc = match bson::to_bson(&self) {
             Ok(d) => d.as_document().unwrap().clone(),
@@ -77,14 +89,16 @@ impl Filter {
     }
 }
 
-pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
+pub fn get_json_files(path: &str, vec: &Mutex<Vec<String>>) {
     let paths = fs::read_dir(path).unwrap();
+    let mut v = Vec::<String>::with_capacity(1000);
 
     paths.for_each(|f| {
         if let Ok(d) = f {
             let p = d.path();
             if p.is_dir() {
-                get_json_files(p.to_str().unwrap(), vec);
+                // get_json_files(p.to_str().unwrap(), vec);
+                v.push(p.to_str().unwrap().to_string());
             } else if let Some(k) = p.extension() {
                 if k == "json" {
                     // info!("found json file : {:?}", p);
@@ -96,7 +110,7 @@ pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
                         .unwrap()
                         .to_string();
                     if m.st_size() > 1024 {
-                        vec.push(path);
+                        vec.lock().unwrap().push(path);
                     } else {
                         info!(
                             "remove file = {}, becase size = {} ",
@@ -109,9 +123,18 @@ pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
             }
         }
     });
+
+    v.into_par_iter().for_each(|f| get_json_files(&f, vec));
 }
 
-fn parse_chem(chem: &Chem) {
+// #[inline]
+fn insert_many(buffer: &Mutex<Vec<Document>>) {
+    let d = &mut buffer.lock().unwrap();
+    let len = d.len();
+    if len > 0 {}
+}
+
+fn parse_chem(chem: &Chem, table: &str, buffer: &Mutex<Vec<Document>>) {
     let cid = chem.record.record_number;
     let mut vec: Vec<String> = Vec::new();
     let mut melting_v: Vec<String> = Vec::new();
@@ -210,15 +233,32 @@ fn parse_chem(chem: &Chem) {
             logp,
         );
         // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
-        let _ = f.save_db();
+
+        let d = &mut buffer.lock().unwrap();
+
+        d.push(f.document().unwrap());
+        let len = d.len();
+        if len == BUFFER_SIZE {
+            let result = Db::insert_many(table, d.to_owned());
+            info!("instert {}, is {}", len, result.is_ok());
+            d.clear();
+        }
+
+        // let _ = f.save_db();
     }
 }
 
-pub fn start_parse(dir: &str, no_update: bool) {
-    let mut vec: Vec<String> = Vec::with_capacity(1000);
-    get_json_files(dir, &mut vec);
+pub fn start_parse(dir: &str, table: &str, no_update: bool) {
+    info!("remove table : {:?}", Db::delete_table(table));
+
+    let vec2 = Mutex::new(Vec::<String>::with_capacity(512));
+    get_json_files(dir, &vec2);
+
+    let vec = vec2.lock().unwrap().to_owned();
 
     info!("path in dir : {}, found json files : {}", dir, vec.len());
+
+    let data = Mutex::new(Vec::<Document>::with_capacity(BUFFER_SIZE));
 
     vec.into_par_iter().for_each(|f| {
         let name = std::path::PathBuf::from(&f)
@@ -230,7 +270,7 @@ pub fn start_parse(dir: &str, no_update: bool) {
         if !no_update || !contains(&name.clone()) {
             let result = parse_json(&f);
             if let Ok(chem) = result {
-                parse_chem(&chem);
+                parse_chem(&chem, table, &data);
             } else {
                 info!("{}, err = {:?}", f, result);
             }
@@ -238,11 +278,18 @@ pub fn start_parse(dir: &str, no_update: bool) {
             info!("cid = {}, already in db", name);
         }
     });
+
+    let d = data.lock().unwrap().to_owned();
+    let len = d.len();
+    if len > 0 {
+        let result = Db::insert_many(table, d);
+        info!("instert {}, is {}", len, result.is_ok());
+    }
 }
 
 pub fn start_filter(name: &str, data: &str, no_update: bool) {
     match name {
-        _ => start_parse(data, no_update),
+        _ => start_parse(data, COLLECTION_FILTER_SMILES_SOLUBILITY, no_update),
     }
 }
 
@@ -398,18 +445,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_name() {
+    fn test_find_json_file() {
+        crate::config::init_config();
+        let vec2 = Mutex::new(Vec::<String>::with_capacity(1024));
+        let dir = "data";
+        get_json_files(dir, &vec2);
+
+        let vec = vec2.lock().unwrap().to_owned();
+
+        info!("path in dir : {}, found json files : {}", dir, vec.len());
+    }
+
+    #[test]
+    fn test_filter_solubitily() {
         crate::config::init_config();
         crate::db::init_db("mongodb://192.168.2.25:27017");
 
-        assert!(contains("2342"));
+        // assert!(contains("2342"));
 
-        // rayon::ThreadPoolBuilder::new()
-        //     .num_threads(24)
-        //     .build_global()
-        //     .unwrap();
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(32)
+            .build_global()
+            .unwrap();
 
-        start_parse("data", false);
+        let table = "test_filter_demo";
+
+        start_parse("data/1000000", table, false);
     }
 
     #[test]
