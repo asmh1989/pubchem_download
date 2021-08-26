@@ -72,10 +72,12 @@ fn main() {
         db::init_db(&format!("mongodb://{}", opt.sql));
     }
 
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(opt.jobs)
-        .build_global()
-        .unwrap();
+    if opt.jobs > 0 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(opt.jobs)
+            .build_global()
+            .unwrap();
+    }
 
     let start = chrono::Utc::now();
     if opt.enable_filter {

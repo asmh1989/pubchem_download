@@ -37,8 +37,8 @@ pub struct Section {
     pub information: Vec<Information>,
     #[serde(rename = "URL")]
     pub url: Option<String>,
-    #[serde(rename = "DisplayControls")]
-    pub display_controls: Option<DisplayControls>,
+    // #[serde(rename = "DisplayControls")]
+    // pub display_controls: Option<DisplayControls>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

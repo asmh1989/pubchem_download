@@ -98,12 +98,13 @@ impl Db {
 
         if result > 0 {
             // info!("db update");
+            update_doc.remove(KEY_CREATE_TIME);
             collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
             update_doc.insert(KEY_CREATE_TIME, date);
-            let result = collection.insert_one(update_doc, None)?;
+            let _result = collection.insert_one(update_doc, None)?;
 
-            info!("db insert {:?}", result);
+            // info!("db insert {:?}", result);
         }
 
         Ok(())

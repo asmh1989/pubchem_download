@@ -30,6 +30,8 @@ pub struct Filter {
     pub inchi: String,
     pub molecular_weight: String,
     pub solubility: Vec<String>,
+    pub melting_point: Vec<String>,
+    pub logp: Vec<String>,
 }
 
 impl Filter {
@@ -39,6 +41,8 @@ impl Filter {
         molecular_weight: String,
         inchi: String,
         solubility: Vec<String>,
+        melting_point: Vec<String>,
+        logp: Vec<String>,
     ) -> Self {
         Self {
             id: None,
@@ -47,6 +51,8 @@ impl Filter {
             molecular_weight,
             solubility,
             inchi,
+            melting_point,
+            logp,
         }
     }
 
@@ -108,6 +114,8 @@ pub fn get_json_files(path: &str, vec: &mut Vec<String>) {
 fn parse_chem(chem: &Chem) {
     let cid = chem.record.record_number;
     let mut vec: Vec<String> = Vec::new();
+    let mut melting_v: Vec<String> = Vec::new();
+    let mut logp: Vec<String> = Vec::new();
     let mut molecular_weight = "".to_string();
     let mut canonical_smiles = "".to_string();
     let mut isomeric_smiles = "".to_string();
@@ -155,12 +163,23 @@ fn parse_chem(chem: &Chem) {
                                     }
                                 });
                             }
+                            "Melting Point" => {
+                                s3.information.iter().for_each(|f| {
+                                    if !f.value.string_with_markup.is_empty() {
+                                        melting_v
+                                            .push(f.value.string_with_markup[0].string.clone());
+                                    }
+                                });
+                            }
+                            "LogP" => {
+                                s3.information.iter().for_each(|f| {
+                                    if !f.value.string_with_markup.is_empty() {
+                                        logp.push(f.value.string_with_markup[0].string.clone());
+                                    }
+                                });
+                            }
                             _ => {}
                         });
-
-                        if vec.is_empty() {
-                            return;
-                        }
                     }
                     "Computed Properties" => {
                         s2.section.iter().for_each(|s3| match &s3.tocheading[..] {
@@ -181,7 +200,15 @@ fn parse_chem(chem: &Chem) {
         });
 
     if !vec.is_empty() {
-        let f = Filter::new(cid, canonical_smiles, molecular_weight, inchi, vec);
+        let f = Filter::new(
+            cid,
+            canonical_smiles,
+            molecular_weight,
+            inchi,
+            vec,
+            melting_v,
+            logp,
+        );
         // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
         let _ = f.save_db();
     }
@@ -377,12 +404,12 @@ mod tests {
 
         assert!(contains("2342"));
 
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(24)
-            .build_global()
-            .unwrap();
+        // rayon::ThreadPoolBuilder::new()
+        //     .num_threads(24)
+        //     .build_global()
+        //     .unwrap();
 
-        start_parse("data/1000000/1000", false);
+        start_parse("data", false);
     }
 
     #[test]
