@@ -86,7 +86,7 @@ fn main() {
             opt.data_path, opt.jobs
         );
 
-        start_filter(&opt.filter_name, &opt.data_path, opt.no_update);
+        start_filter(&opt.filter_name, &opt.data_path);
     } else {
         info!(
             "start download = {}, threads = {}",

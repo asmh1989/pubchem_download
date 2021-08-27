@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::BufWriter,
     os::linux::fs::MetadataExt,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use log::info;
@@ -134,7 +134,7 @@ fn insert_many(buffer: &Mutex<Vec<Document>>) {
     if len > 0 {}
 }
 
-fn parse_chem(chem: &Chem, table: &str, buffer: &Mutex<Vec<Document>>) {
+fn parse_chem(chem: &Chem, table: &str, buffer: &Arc<Mutex<Vec<Document>>>) {
     let cid = chem.record.record_number;
     let mut vec: Vec<String> = Vec::new();
     let mut melting_v: Vec<String> = Vec::new();
@@ -248,8 +248,8 @@ fn parse_chem(chem: &Chem, table: &str, buffer: &Mutex<Vec<Document>>) {
     }
 }
 
-pub fn start_parse(dir: &str, table: &str, no_update: bool) {
-    info!("remove table : {:?}", Db::delete_table(table));
+pub fn start_parse(dir: &str, table: &str) {
+    // info!("remove table : {:?}", Db::delete_table(table));
 
     let vec2 = Mutex::new(Vec::<String>::with_capacity(512));
     get_json_files(dir, &vec2);
@@ -258,25 +258,57 @@ pub fn start_parse(dir: &str, table: &str, no_update: bool) {
 
     info!("path in dir : {}, found json files : {}", dir, vec.len());
 
-    let data = Mutex::new(Vec::<Document>::with_capacity(BUFFER_SIZE));
+    let data = Arc::new(Mutex::new(Vec::<Document>::with_capacity(BUFFER_SIZE)));
 
-    vec.into_par_iter().for_each(|f| {
-        let name = std::path::PathBuf::from(&f)
-            .file_stem()
-            .unwrap()
-            .to_os_string()
-            .into_string()
-            .unwrap();
-        if !no_update || !contains(&name.clone()) {
-            let result = parse_json(&f);
-            if let Ok(chem) = result {
-                parse_chem(&chem, table, &data);
-            } else {
-                info!("{}, err = {:?}", f, result);
+    rayon::scope(|s| {
+        let count = Arc::new(Mutex::new(0));
+        let c_count = Arc::clone(&count);
+        let c_data = Arc::clone(&data);
+        let finish = Arc::new(Mutex::new(false));
+        let c_finish = Arc::clone(&finish);
+        s.spawn(move |_| {
+            vec.into_par_iter().for_each(|f| {
+                // info!("start parse {}", f);
+                *c_count.lock().unwrap() += 1;
+
+                // let name = std::path::PathBuf::from(&f)
+                //     .file_stem()
+                //     .unwrap()
+                //     .to_os_string()
+                //     .into_string()
+                //     .unwrap();
+
+                // if contains(&name, table) {
+                //     return;
+                // }
+                let result = parse_json(&f);
+                if let Ok(chem) = result {
+                    parse_chem(&chem, table, &c_data);
+                } else {
+                    info!("{}, err = {:?}", f, result);
+                }
+            });
+
+            *c_finish.lock().unwrap() = true;
+        });
+
+        let mut times = 0;
+        let mut prev = 0;
+
+        s.spawn(move |_| loop {
+            if *finish.lock().unwrap() {
+                break;
             }
-        } else {
-            info!("cid = {}, already in db", name);
-        }
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+            if times == 30 {
+                let p = *count.lock().unwrap();
+                info!("30 s, finish parse file counter = {}", p - prev);
+                prev = p;
+                times = 0;
+            } else {
+                times += 1;
+            }
+        });
     });
 
     let d = data.lock().unwrap().to_owned();
@@ -287,17 +319,14 @@ pub fn start_parse(dir: &str, table: &str, no_update: bool) {
     }
 }
 
-pub fn start_filter(name: &str, data: &str, no_update: bool) {
+pub fn start_filter(name: &str, data: &str) {
     match name {
-        _ => start_parse(data, COLLECTION_FILTER_SMILES_SOLUBILITY, no_update),
+        _ => start_parse(data, COLLECTION_FILTER_SMILES_SOLUBILITY),
     }
 }
 
-fn contains(cid: &str) -> bool {
-    Db::contians(
-        COLLECTION_FILTER_SMILES_SOLUBILITY,
-        doc! {"cid":cid.parse::<i64>().unwrap()},
-    )
+fn contains(cid: &str, table: &str) -> bool {
+    Db::contians(table, doc! {"cid":cid.parse::<i64>().unwrap()})
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -461,16 +490,19 @@ mod tests {
         crate::config::init_config();
         crate::db::init_db("mongodb://192.168.2.25:27017");
 
-        // assert!(contains("2342"));
+        let table = "test_filter_demo";
 
         rayon::ThreadPoolBuilder::new()
-            .num_threads(32)
+            .num_threads(16)
             .build_global()
             .unwrap();
 
-        let table = "test_filter_demo";
-
-        start_parse("data/1000000", table, false);
+        start_parse("data/1000000", table);
+        // start_parse("data/2000000", table, false);
+        // start_parse("data/3000000", table, false);
+        // start_parse("data/4000000", table, false);
+        // start_parse("data", table);
+        // start_parse("data/6000000", table, false);
     }
 
     #[test]

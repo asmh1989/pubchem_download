@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Chem {
     #[serde(rename = "Record")]
     pub record: Record,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Record {
     #[serde(rename = "RecordType")]
     pub record_type: String,
@@ -23,12 +23,12 @@ pub struct Record {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Section {
     #[serde(rename = "TOCHeading")]
     pub tocheading: String,
-    #[serde(rename = "Description")]
-    pub description: Option<String>,
+    // #[serde(rename = "Description")]
+    // pub description: Option<String>,
     #[serde(rename = "Section")]
     #[serde(default)]
     pub section: Vec<Section>,
@@ -42,17 +42,17 @@ pub struct Section {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Information {
     #[serde(rename = "ReferenceNumber")]
     pub reference_number: i64,
-    #[serde(rename = "Description")]
-    pub description: Option<String>,
+    // #[serde(rename = "Description")]
+    // pub description: Option<String>,
     #[serde(rename = "Value")]
     pub value: Value,
-    #[serde(rename = "Reference")]
-    #[serde(default)]
-    pub reference: Vec<String>,
+    // #[serde(rename = "Reference")]
+    // #[serde(default)]
+    // pub reference: Vec<String>,
     #[serde(rename = "Name")]
     pub name: Option<String>,
     #[serde(rename = "URL")]
@@ -60,7 +60,7 @@ pub struct Information {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Value {
     #[serde(rename = "StringWithMarkup")]
     #[serde(default)]
@@ -70,9 +70,9 @@ pub struct Value {
     #[serde(rename = "Number")]
     #[serde(default)]
     pub number: Vec<f64>,
-    #[serde(rename = "ExternalDataURL")]
-    #[serde(default)]
-    pub external_data_url: Vec<String>,
+    // #[serde(rename = "ExternalDataURL")]
+    // #[serde(default)]
+    // pub external_data_url: Vec<String>,
     #[serde(rename = "MimeType")]
     pub mime_type: Option<String>,
     #[serde(rename = "ExternalTableName")]
@@ -82,7 +82,7 @@ pub struct Value {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct StringWithMarkup {
     #[serde(rename = "String")]
     pub string: String,
@@ -92,7 +92,7 @@ pub struct StringWithMarkup {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Markup {
     #[serde(rename = "Start")]
     pub start: i64,
@@ -107,7 +107,7 @@ pub struct Markup {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct DisplayControls {
     #[serde(rename = "CreateTable")]
     pub create_table: Option<CreateTable>,
@@ -122,7 +122,7 @@ pub struct DisplayControls {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct CreateTable {
     #[serde(rename = "FromInformationIn")]
     pub from_information_in: String,
@@ -134,7 +134,7 @@ pub struct CreateTable {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Reference {
     #[serde(rename = "ReferenceNumber")]
     pub reference_number: i64,
@@ -164,6 +164,17 @@ pub fn parse_json(file: &str) -> Result<Chem, String> {
     let json: Chem = serde_json::from_str(&str).map_err(|f| f.to_string())?;
 
     Ok(json)
+}
+
+pub fn parse_json2(file: &str) -> Result<Chem, String> {
+    let r = std::fs::File::open(file).map_err(|f| f.to_string())?;
+    let result = serde_json::from_reader(&r);
+    if result.is_ok() {
+        Ok(result.unwrap())
+    } else {
+        log::info!("json reader error {}", file);
+        parse_json2(file)
+    }
 }
 
 #[cfg(test)]
