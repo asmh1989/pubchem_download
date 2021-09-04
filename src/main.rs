@@ -72,7 +72,7 @@ fn main() {
         db::init_db(&format!("mongodb://{}", opt.sql));
     }
 
-    if opt.jobs > 0 {
+    if opt.jobs > 0 && !opt.enable_proxy {
         rayon::ThreadPoolBuilder::new()
             .num_threads(opt.jobs)
             .build_global()
@@ -89,11 +89,15 @@ fn main() {
         start_filter(&opt.filter_name, &opt.data_path);
     } else {
         info!(
-            "start download = {}, threads = {}",
-            opt.download_start, opt.jobs
+            "start download = {}, threads = {}, proxy = {}",
+            opt.download_start, opt.jobs, opt.enable_proxy
         );
 
-        download::download_chems(opt.download_start, opt.enable_db);
+        if opt.enable_proxy {
+            download::download_chems_proxy(opt.download_start, opt.enable_db, opt.jobs);
+        } else {
+            download::download_chems(opt.download_start, opt.enable_db);
+        }
     }
 
     let time = chrono::Utc::now() - start;
