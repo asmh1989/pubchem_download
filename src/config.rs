@@ -41,7 +41,10 @@ fn init_log() {
         )
         .unwrap();
 
-    let _ = log4rs::init_config(config).unwrap();
+    let result = log4rs::init_config(config);
+    if result.is_err() {
+        print!("init log error : {:?}", result);
+    }
 }
 
 pub fn init_config() {
