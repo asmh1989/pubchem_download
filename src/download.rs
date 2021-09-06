@@ -21,13 +21,14 @@ use crate::{
 
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
+        (""),
+        ("106.12.88.204:8888"),
+        ("106.12.26.206:8888"),
+        ("173.82.20.11:8880"),
         ("127.0.0.1:7890"),
         ("127.0.0.1:7891"),
         ("127.0.0.1:7892"),
         ("127.0.0.1:7893"),
-        ("106.12.88.204:8888"),
-        ("173.82.20.11:8880"),
-        ("106.12.26.206:8888"),
         // (""),
     ]
     .iter()
@@ -70,11 +71,7 @@ fn fetch_url(f: usize, file_name: String, usb_db: bool, ip: &str) -> Result<(), 
             let _ = d.save_db();
         }
 
-        return Err(format!(
-            "请求失败! code = {} ip = {}",
-            response.status(),
-            ip
-        ));
+        return Err(format!("请求失败! code = {}", response.status()));
     }
     let bytes = response.bytes().map_err(|e| e.to_string())?;
     if bytes.len() < 1024 {

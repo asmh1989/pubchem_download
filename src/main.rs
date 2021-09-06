@@ -11,6 +11,7 @@ mod config;
 mod db;
 mod download;
 mod filter;
+mod list;
 mod model;
 
 fn main() {
@@ -66,7 +67,10 @@ fn main() {
         .unwrap()
         .set_download_start(opt.download_start);
 
-    info!("{:#?}", opt);
+    if opt.list {
+        crate::list::list(&opt.data_path);
+        return;
+    }
 
     if opt.enable_db {
         db::init_db(&format!("mongodb://{}", opt.sql));
@@ -78,6 +82,8 @@ fn main() {
             .build_global()
             .unwrap();
     }
+
+    info!("{:#?}", opt);
 
     let start = chrono::Utc::now();
     if opt.enable_filter {

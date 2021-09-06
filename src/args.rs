@@ -33,6 +33,9 @@ pub struct Opt {
     #[structopt(long = "no-update", help = "过滤任务时, 不去更新已在数据库中的数据")]
     pub no_update: bool,
 
+    #[structopt(short = "l", long = "list", help = "统计json文件数量")]
+    pub list: bool,
+
     #[structopt(
         long = "filter-name",
         short = "n",
