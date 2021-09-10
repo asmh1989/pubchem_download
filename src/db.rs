@@ -89,7 +89,7 @@ impl Db {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
         let collection = db.collection(table);
-        let date = Bson::DateTime(chrono::Utc::now());
+        let date = Bson::DateTime(mongodb::bson::DateTime::now());
         let data2: Vec<Document> = data
             .clone()
             .iter_mut()
@@ -108,7 +108,7 @@ impl Db {
     pub fn delete_table(table: &str) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
         let _ = collection.drop(None)?;
         Ok(())
     }
@@ -119,7 +119,7 @@ impl Db {
         let collection = db.collection(table);
 
         let mut update_doc = app;
-        let date = Bson::DateTime(chrono::Utc::now());
+        let date = Bson::DateTime(mongodb::bson::DateTime::now());
         update_doc.insert(KEY_UPDATE_TIME, date.clone());
 
         let result = collection.find_one_and_update(
@@ -144,7 +144,7 @@ impl Db {
     pub fn delete(table: &str, filter: Document) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
 
         let result = collection.delete_one(filter, None)?;
 
@@ -156,7 +156,7 @@ impl Db {
     pub fn contians(table: &str, filter: Document) -> bool {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
 
         let result = collection.count_documents(filter, None);
 
@@ -166,10 +166,10 @@ impl Db {
         }
     }
 
-    pub fn count(table: &str, filter: Document) -> i64 {
+    pub fn count(table: &str, filter: Document) -> u64 {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let collection = db.collection::<Document>(table);
 
         let result = collection.count_documents(filter, None);
 

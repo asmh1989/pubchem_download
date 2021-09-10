@@ -11,8 +11,10 @@ mod config;
 mod db;
 mod download;
 mod filter;
+mod filter_bio;
 mod list;
 mod model;
+mod shell;
 
 fn main() {
     // println!("Hello, world!");
