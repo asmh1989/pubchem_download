@@ -21,6 +21,7 @@ use crate::{
 
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
+        ("139.9.148.153:9993"),
         (""),
         ("106.12.88.204:8888"),
         ("106.12.26.206:8888"),
