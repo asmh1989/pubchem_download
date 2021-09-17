@@ -7,6 +7,8 @@ pub fn get_json_files(path: &str, count: &Arc<Mutex<usize>>) {
     let paths = std::fs::read_dir(path).unwrap();
     let mut v = Vec::<String>::with_capacity(1000);
 
+    let mut c: usize = 0;
+
     paths.for_each(|f| {
         if let Ok(d) = f {
             let p = d.path();
@@ -15,11 +17,13 @@ pub fn get_json_files(path: &str, count: &Arc<Mutex<usize>>) {
                 v.push(p.to_str().unwrap().to_string());
             } else if let Some(k) = p.extension() {
                 if k == "json" {
-                    *count.lock().unwrap() += 1;
+                    c += 1;
                 }
             }
         }
     });
+
+    *count.lock().unwrap() += c;
 
     v.into_par_iter().for_each(|f| get_json_files(&f, count));
 }
