@@ -21,16 +21,15 @@ use crate::{
 
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
-        // ("139.9.148.153:9993"),
         (""),
         ("106.12.88.204:8888"),
         ("106.12.26.206:8888"),
         ("173.82.20.11:8880"),
-        ("127.0.0.1:7890"),
-        ("127.0.0.1:7891"),
-        ("127.0.0.1:7892"),
-        ("127.0.0.1:7893"),
-        // (""),
+        ("192.168.2.25:7890"),
+        ("192.168.2.25:7891"),
+        ("192.168.2.25:7892"),
+        ("192.168.2.25:7893"),
+        // ("139.9.148.153:9993"),
     ]
     .iter()
     .cloned()
@@ -151,6 +150,7 @@ fn get_chem(f: usize, use_db: bool, flags: &Arc<Mutex<Vec<usize>>>) {
                     let result = fetch_url(f, path.clone(), use_db, str);
                     if result.is_err() {
                         info!("id = {}, ip = {} , result = {:?}", f, str, result);
+                        thread::sleep(Duration::from_millis(10000));
                     }
                     unlock_ip(flags, i);
                     break;
@@ -199,7 +199,7 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
 }
 
 pub fn download_chems(start: usize, use_db: bool) {
-    let step = 1000000;
+    let step = 20000000;
 
     (max(1, start * step)..(start + 1) * step)
         .into_par_iter()
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_download() {
         init();
-        download_chems_proxy(4, true, 6);
+        download_chems_proxy(4, true, 1);
     }
 
     #[test]
