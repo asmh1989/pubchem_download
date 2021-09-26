@@ -25,6 +25,7 @@ static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
         ("106.12.88.204:8888"),
         ("106.12.26.206:8888"),
         ("173.82.20.11:8880"),
+        ("106.12.176.121:8888"),
         ("192.168.2.25:7890"),
         ("192.168.2.25:7891"),
         ("192.168.2.25:7892"),
@@ -117,7 +118,7 @@ pub fn file_exist(path: &str) -> bool {
 
 #[inline]
 fn get_url(f: usize) -> String {
-    format!("http://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
+    format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
 }
 
 fn lock_ip(flags: &Arc<Mutex<Vec<usize>>>) -> Option<usize> {
@@ -150,7 +151,7 @@ fn get_chem(f: usize, use_db: bool, flags: &Arc<Mutex<Vec<usize>>>) {
                     let result = fetch_url(f, path.clone(), use_db, str);
                     if result.is_err() {
                         info!("id = {}, ip = {} , result = {:?}", f, str, result);
-                        thread::sleep(Duration::from_millis(10000));
+                        thread::sleep(Duration::from_millis(3000));
                     }
                     unlock_ip(flags, i);
                     break;

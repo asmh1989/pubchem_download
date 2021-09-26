@@ -1,39 +1,24 @@
-use std::sync::{Arc, Mutex};
-
+use jwalk::WalkDirGeneric;
 use log::info;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-pub fn get_json_files(path: &str, count: &Arc<Mutex<usize>>) {
-    let paths = std::fs::read_dir(path).unwrap();
-    let mut v = Vec::<String>::with_capacity(1000);
-
+pub fn get_json_files(p: &str) -> usize {
     let mut c: usize = 0;
 
-    paths.for_each(|f| {
-        if let Ok(d) = f {
-            let p = d.path();
-            if p.is_dir() {
-                // get_json_files(p.to_str().unwrap(), vec);
-                v.push(p.to_str().unwrap().to_string());
-            } else if let Some(k) = p.extension() {
-                if k == "json" {
-                    c += 1;
-                }
+    for entry in WalkDirGeneric::<((), ())>::new(p).process_read_dir(move |_, _, _, _| {}) {
+        if let Some(k) = entry.unwrap().path().extension() {
+            if k == "json" {
+                c += 1;
             }
         }
-    });
+    }
 
-    *count.lock().unwrap() += c;
-
-    v.into_par_iter().for_each(|f| get_json_files(&f, count));
+    c
 }
 
 pub fn list(dir: &str) {
     info!("start cal json files ..");
-    let vec2 = Arc::new(Mutex::new(0));
-    get_json_files(dir, &vec2);
-    let vec = vec2.lock().unwrap().to_owned();
-    info!("path in dir : {}, found json files : {}", dir, vec);
+    let c = get_json_files(dir);
+    info!("path in dir : {}, found json files : {}", dir, c);
 }
 
 #[cfg(test)]
