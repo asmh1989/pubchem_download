@@ -2,17 +2,30 @@ use jwalk::WalkDirGeneric;
 use log::info;
 
 pub fn get_json_files(p: &str) -> usize {
-    let mut c: usize = 0;
+    // let mut c: usize = 0;
 
-    for entry in WalkDirGeneric::<((), ())>::new(p).process_read_dir(move |_, _, _, _| {}) {
-        if let Some(k) = entry.unwrap().path().extension() {
-            if k == "json" {
-                c += 1;
+    WalkDirGeneric::<((), ())>::new(p)
+        .process_read_dir(move |_, _, _, _| {})
+        .into_iter()
+        .filter(|f| {
+            if let Some(k) = f.as_ref().unwrap().path().extension() {
+                if k == "json" {
+                    return true;
+                }
             }
-        }
-    }
+            return false;
+        })
+        .count()
 
-    c
+    // for entry in WalkDirGeneric::<((), ())>::new(p).process_read_dir(move |_, _, _, _| {}) {
+    //     if let Some(k) = entry.unwrap().path().extension() {
+    //         if k == "json" {
+    //             c += 1;
+    //         }
+    //     }
+    // }
+
+    // c
 }
 
 pub fn list(dir: &str) {
