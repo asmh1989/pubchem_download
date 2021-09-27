@@ -1,3 +1,6 @@
+use crossbeam_deque::Steal::Success;
+use crossbeam_deque::Worker;
+
 use log::info;
 
 use once_cell::sync::Lazy;
@@ -172,7 +175,8 @@ fn get_chem(f: usize, use_db: bool, flags: &Arc<Mutex<Vec<usize>>>) {
 
 pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
     let step = 20000000;
-    let count = HTTP_PROXYS.lock().unwrap().len();
+    let v = HTTP_PROXYS.lock().unwrap().clone();
+    let count = v.len();
 
     let job = config::Config::jobs();
     if job != threads {
@@ -187,12 +191,40 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
         .build_global()
         .unwrap();
 
+    let work: Worker<&str> = Worker::new_lifo();
+
+    v.iter()
+        .for_each(|&f| (0..threads).for_each(|_| work.push(f)));
+
+    let w = Mutex::new(work);
+
     loop {
-        let flags = Arc::new(Mutex::new(vec![0; count]));
         (max(1, start * step)..(start + 1) * step)
             .into_par_iter()
             .for_each(|f| {
-                get_chem(f, use_db, &flags);
+                let path = format!("data/{}", get_path_by_id(f));
+
+                if !file_exist(&path) {
+                    if !use_db
+                        || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string()))
+                    {
+                        loop {
+                            let s = w.lock().unwrap().stealer();
+                            if let Success(str) = s.steal() {
+                                let result = fetch_url(f, path.clone(), use_db, str);
+                                if result.is_err() {
+                                    info!("id = {}, ip = {} , result = {:?}", f, str, result);
+                                    thread::sleep(Duration::from_millis(2000));
+                                }
+                                w.lock().unwrap().push(str);
+                                break;
+                            } else {
+                                log::warn!("steal is Empty ...");
+                                thread::sleep(Duration::from_millis(3000));
+                            }
+                        }
+                    }
+                }
             });
 
         thread::sleep(Duration::from_millis(1500));
@@ -276,7 +308,7 @@ mod tests {
     #[test]
     fn test_download() {
         init();
-        download_chems_proxy(4, true, 1);
+        download_chems_proxy(2, true, 4);
     }
 
     #[test]

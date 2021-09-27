@@ -1342,6 +1342,7 @@ name = "pub_chem_download"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "crossbeam-deque",
  "csv",
  "jwalk",
  "log",
