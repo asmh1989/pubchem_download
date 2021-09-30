@@ -25,10 +25,10 @@ use crate::{
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
         (""),
-        ("106.12.88.204:8888"),
-        ("106.12.26.206:8888"),
-        ("173.82.20.11:8880"),
-        ("106.12.176.121:8888"),
+        ("106.12.88.204:18888"),
+        ("106.12.26.206:18888"),
+        ("173.82.20.11:18888"),
+        ("106.12.176.121:18888"),
         ("192.168.2.25:7890"),
         ("192.168.2.25:7891"),
         ("192.168.2.25:7892"),
@@ -289,7 +289,7 @@ mod tests {
         init();
 
         let client = reqwest::blocking::Client::builder()
-            .proxy(reqwest::Proxy::http("106.12.88.204:8888").expect("http proxy set error"))
+            .proxy(reqwest::Proxy::http("106.12.26.206:8888").expect("http proxy set error"))
             .build()
             .unwrap();
 
