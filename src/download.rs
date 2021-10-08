@@ -6,13 +6,7 @@ use log::info;
 use once_cell::sync::Lazy;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
-    cmp::max,
-    fs,
-    io::Cursor,
-    os::unix::prelude::MetadataExt,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
+    cmp::max, fs, io::Cursor, os::unix::prelude::MetadataExt, sync::Mutex, thread, time::Duration,
 };
 
 use crate::{
@@ -43,10 +37,10 @@ static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
 });
 
 fn fetch_url(f: usize, file_name: String, usb_db: bool, ip: &str) -> Result<(), String> {
-    info!(
-        "start download id = {}, path = {}, ip = {}",
-        f, file_name, ip
-    );
+    // info!(
+    //     "start download id = {}, path = {}, ip = {}",
+    //     f, file_name, ip
+    // );
 
     let url = get_url(f);
     let path = std::path::Path::new(&file_name);
@@ -119,64 +113,25 @@ pub fn file_exist(path: &str) -> bool {
     }
 }
 
+// #[inline]
+// fn get_url(f: usize) -> String {
+//     format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
+// }
+
 #[inline]
 fn get_url(f: usize) -> String {
-    format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
-}
-
-fn lock_ip(flags: &Arc<Mutex<Vec<usize>>>) -> Option<usize> {
-    let d = &mut flags.lock().unwrap();
-    let f = d.iter_mut().enumerate().find_map(|(k, v)| {
-        if *v < config::Config::jobs() {
-            *v += 1;
-            return Some(k);
-        }
-        return None;
-    });
-    f
-}
-
-fn unlock_ip(flags: &Arc<Mutex<Vec<usize>>>, index: usize) {
-    let d = &mut flags.lock().unwrap();
-    d[index] -= 1;
-}
-
-fn get_chem(f: usize, use_db: bool, flags: &Arc<Mutex<Vec<usize>>>) {
-    let path = format!("data/{}", get_path_by_id(f as usize));
-    let ips = HTTP_PROXYS.lock().unwrap().clone();
-
-    if !file_exist(&path) {
-        if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
-            loop {
-                let ip = lock_ip(flags);
-                if let Some(i) = ip {
-                    let str = ips.get(i).unwrap().clone();
-                    let result = fetch_url(f, path.clone(), use_db, str);
-                    if result.is_err() {
-                        info!("id = {}, ip = {} , result = {:?}", f, str, result);
-                        thread::sleep(Duration::from_millis(3000));
-                    }
-                    unlock_ip(flags, i);
-                    break;
-                } else {
-                    info!(
-                        "need sleep ... id = {}, flags = {:?}",
-                        f,
-                        flags.lock().unwrap().clone()
-                    );
-                    thread::sleep(Duration::from_millis(3000));
-                }
-            }
-        }
-    } else {
-        // info!("already download {}", f);
-    }
+    format!(
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/",
+        f
+    )
 }
 
 pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
-    let step = 20000000;
+    let step = 2000000;
     let v = HTTP_PROXYS.lock().unwrap().clone();
     let count = v.len();
+
+    let mut index = start;
 
     let job = config::Config::jobs();
     if job != threads {
@@ -199,10 +154,11 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
     let w = Mutex::new(work);
 
     loop {
-        (max(1, start * step)..(start + 1) * step)
+        (max(1, index * step)..(index + 1) * step)
             .into_par_iter()
             .for_each(|f| {
                 let path = format!("data/{}", get_path_by_id(f));
+                let mut time = 0;
 
                 if !file_exist(&path) {
                     if !use_db
@@ -213,11 +169,23 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
                             if let Success(str) = s.steal() {
                                 let result = fetch_url(f, path.clone(), use_db, str);
                                 if result.is_err() {
-                                    info!("id = {}, ip = {} , result = {:?}", f, str, result);
-                                    thread::sleep(Duration::from_millis(2000));
+                                    info!("path = {}, ip = {} , result = {:?}", path, str, result);
+                                    thread::sleep(Duration::from_millis(3000));
+                                    w.lock().unwrap().push(str);
+                                    time += 1;
+                                    if time > 16 {
+                                        break;
+                                    }
+                                } else {
+                                    if time > 0 {
+                                        info!(
+                                            "path = {}, ip = {} times = {}, download success!!",
+                                            path, str, time
+                                        );
+                                    }
+                                    w.lock().unwrap().push(str);
+                                    break;
                                 }
-                                w.lock().unwrap().push(str);
-                                break;
                             } else {
                                 log::warn!("steal is Empty ...");
                                 thread::sleep(Duration::from_millis(3000));
@@ -227,7 +195,9 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
                 }
             });
 
-        thread::sleep(Duration::from_millis(1500));
+        thread::sleep(Duration::from_millis(2000));
+
+        index += 1;
     }
 }
 
