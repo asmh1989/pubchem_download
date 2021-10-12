@@ -19,15 +19,15 @@ use crate::{
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
         (""),
-        ("106.12.88.204:18888"),
-        ("106.12.26.206:18888"),
+        ("192.168.2.25:28080"),
+        ("192.168.2.25:28081"),
+        ("192.168.2.25:28082"),
+        ("192.168.2.25:28083"),
         ("173.82.20.11:18888"),
-        ("106.12.176.121:18888"),
         ("192.168.2.25:7890"),
         ("192.168.2.25:7891"),
         ("192.168.2.25:7892"),
         ("192.168.2.25:7893"),
-        // ("139.9.148.153:9993"),
     ]
     .iter()
     .cloned()
@@ -113,21 +113,21 @@ pub fn file_exist(path: &str) -> bool {
     }
 }
 
-// #[inline]
-// fn get_url(f: usize) -> String {
-//     format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
-// }
-
 #[inline]
 fn get_url(f: usize) -> String {
-    format!(
-        "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/",
-        f
-    )
+    format!("https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/?response_type=save&response_basename=compound_CID_{}", f, f)
 }
 
+// #[inline]
+// fn get_url(f: usize) -> String {
+//     format!(
+//         "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{}/JSON/",
+//         f
+//     )
+// }
+
 pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
-    let step = 2000000;
+    let step = 20000000;
     let v = HTTP_PROXYS.lock().unwrap().clone();
     let count = v.len();
 
