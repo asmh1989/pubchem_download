@@ -81,7 +81,7 @@ fn fetch_url(f: usize, file_name: String, usb_db: bool, ip: &str) -> Result<(), 
     Ok(())
 }
 
-fn get_path_by_id(id: usize) -> String {
+pub fn get_path_by_id(id: usize) -> String {
     let million: usize = 1000000;
     let thousand: usize = 1000;
 

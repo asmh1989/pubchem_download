@@ -12,6 +12,7 @@ mod db;
 mod download;
 mod filter;
 mod filter_bio;
+mod full;
 mod list;
 mod model;
 mod shell;
@@ -71,6 +72,12 @@ fn main() {
 
     if opt.list {
         crate::list::list(&opt.data_path);
+        return;
+    }
+
+    if opt.save {
+        db::init_db(&format!("mongodb://{}", opt.sql));
+        crate::full::save_to_db(&opt.data_path);
         return;
     }
 

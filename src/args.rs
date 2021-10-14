@@ -36,6 +36,9 @@ pub struct Opt {
     #[structopt(short = "l", long = "list", help = "统计json文件数量")]
     pub list: bool,
 
+    #[structopt(long = "save", help = "保存到数据库")]
+    pub save: bool,
+
     #[structopt(
         long = "filter-name",
         short = "n",

@@ -113,10 +113,15 @@ impl Db {
         Ok(())
     }
 
-    pub fn save(table: &str, filter: Document, app: Document) -> Result<(), Error> {
+    pub fn save_with_table(
+        table: &str,
+        c: &str,
+        filter: Document,
+        app: Document,
+    ) -> Result<(), Error> {
         let client = Db::get_instance();
-        let db = client.database(TABLE_NAME);
-        let collection = db.collection(table);
+        let db = client.database(table);
+        let collection = db.collection(c);
 
         let mut update_doc = app;
         let date = Bson::DateTime(mongodb::bson::DateTime::now());
@@ -129,16 +134,20 @@ impl Db {
         )?;
 
         if !result.is_none() {
-            info!("db update");
+            info!("db update: {:?}", filter.clone());
             // collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
             update_doc.insert(KEY_CREATE_TIME, date);
-            let result = collection.insert_one(update_doc, None)?;
+            let _ = collection.insert_one(update_doc, None)?;
 
-            info!("db insert {:?}", result);
+            // info!("db insert {:?}", filter.clone());
         }
 
         Ok(())
+    }
+
+    pub fn save(c: &str, filter: Document, app: Document) -> Result<(), Error> {
+        return Db::save_with_table(TABLE_NAME, c, filter, app);
     }
 
     pub fn delete(table: &str, filter: Document) -> Result<(), Error> {
@@ -166,10 +175,10 @@ impl Db {
         }
     }
 
-    pub fn count(table: &str, filter: Document) -> u64 {
+    pub fn count_with_table(table: &str, c: &str, filter: Document) -> u64 {
         let client = Db::get_instance();
-        let db = client.database(TABLE_NAME);
-        let collection = db.collection::<Document>(table);
+        let db = client.database(table);
+        let collection = db.collection::<Document>(c);
 
         let result = collection.count_documents(filter, None);
 
@@ -177,6 +186,10 @@ impl Db {
             Ok(d) => d,
             Err(_) => 0,
         }
+    }
+
+    pub fn count(table: &str, filter: Document) -> u64 {
+        Db::count_with_table(TABLE_NAME, table, filter)
     }
 }
 

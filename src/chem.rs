@@ -27,8 +27,8 @@ pub struct Record {
 pub struct Section {
     #[serde(rename = "TOCHeading")]
     pub tocheading: String,
-    // #[serde(rename = "Description")]
-    // pub description: Option<String>,
+    #[serde(rename = "Description")]
+    pub description: Option<String>,
     #[serde(rename = "Section")]
     #[serde(default)]
     pub section: Vec<Section>,
