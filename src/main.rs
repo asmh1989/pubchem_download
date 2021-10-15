@@ -68,7 +68,7 @@ fn main() {
     config::Config::get_instance()
         .lock()
         .unwrap()
-        .set_download_start(opt.download_start);
+        .set_download_start(opt.start);
 
     if opt.list {
         crate::list::list(&opt.data_path);
@@ -105,13 +105,13 @@ fn main() {
     } else {
         info!(
             "start download = {}, threads = {}, proxy = {}",
-            opt.download_start, opt.jobs, opt.enable_proxy
+            opt.start, opt.jobs, opt.enable_proxy
         );
 
         if opt.enable_proxy {
-            download::download_chems_proxy(opt.download_start, opt.enable_db, opt.jobs);
+            download::download_chems_proxy(opt.start, opt.enable_db, opt.jobs);
         } else {
-            download::download_chems(opt.download_start, opt.enable_db);
+            download::download_chems(opt.start, opt.enable_db);
         }
     }
 

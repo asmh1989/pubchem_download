@@ -1,7 +1,7 @@
 use log::info;
 use mongodb::{
     bson::{self, doc, Bson, Document},
-    options::FindOneOptions,
+    options::FindOptions,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -248,17 +248,24 @@ fn parse_chem(chem: &Chem, update: bool) {
 
 fn save_by_path(path: &str, update: bool) {
     if download::file_exist(path) {
-        let chem = crate::chem::parse_json(path).unwrap();
-        parse_chem(&chem, update);
+        let chem = crate::chem::parse_json(path);
+        if let Ok(r) = chem {
+            parse_chem(&r, update);
+        } else {
+            log::error!("path({}) parse error! please check!", path);
+        }
     } else {
         log::info!("path = {}, not exist!!", path);
     }
 }
 
-pub fn save_to_db(data: &str) {
-    let find_options = FindOneOptions::builder().sort(doc! { "cid": -1 }).build();
+fn find_max_cid() -> usize {
+    let find_options = FindOptions::builder()
+        .sort(doc! { "cid": -1 })
+        .limit(1)
+        .build();
 
-    let last = Db::find_one_with_table(
+    let last = Db::find_with_table(
         DB_TABLE,
         DB_COLLECT,
         doc! {"source" : SOURCE.to_string()},
@@ -267,8 +274,8 @@ pub fn save_to_db(data: &str) {
 
     let mut start = 0;
 
-    if let Ok(c) = last {
-        if let Some(cc) = c {
+    if let Ok(mut c) = last {
+        if let Ok(cc) = c.next().unwrap() {
             let result = bson::from_bson::<SZData>(Bson::Document(cc));
             if let Ok(ccc) = result {
                 start = ccc.cid as usize;
@@ -276,7 +283,13 @@ pub fn save_to_db(data: &str) {
         }
     }
 
-    let count = Db::count_with_table(DB_TABLE, DB_COLLECT, doc! {"source" : SOURCE.to_string()});
+    start
+}
+
+pub fn save_to_db(data: &str) {
+    let mut start = find_max_cid();
+
+    let count = Db::count_with_table2(DB_TABLE, DB_COLLECT);
 
     info!("find already count = {}, start save id = {}", count, start);
 
@@ -303,6 +316,11 @@ pub fn save_to_db(data: &str) {
         });
 
         start += STEP;
+
+        if start > 101233349 {
+            info!("finish ...");
+            break;
+        }
     }
 }
 
@@ -311,10 +329,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_max_cid() {
+        crate::db::init_db("mongodb://sz:sz@192.168.2.26:27017");
+        crate::config::init_config();
+        info!("start find max cid");
+        info!("max cid = {}", find_max_cid());
+        info!("count ...");
+        info!("count = {}", Db::count_with_table2(DB_TABLE, DB_COLLECT));
+    }
+
+    #[test]
     fn test_parse() {
         crate::config::init_config();
 
-        let path = format!("data/{}", crate::download::get_path_by_id(223));
+        let path = format!("data/{}", crate::download::get_path_by_id(42453744));
 
         let chem = crate::chem::parse_json(&path).unwrap();
 
@@ -330,5 +358,32 @@ mod tests {
     fn test_save() {
         init();
         save_to_db("data");
+    }
+
+    #[test]
+    fn test_delete_error_file() {
+        init();
+        let mut start = 42450000;
+
+        let step = 10000;
+
+        loop {
+            info!("check start = {}", start);
+            (start..(start + step)).into_par_iter().for_each(|f| {
+                let path = format!("data/{}", crate::download::get_path_by_id(f));
+                if download::file_exist(&path) {
+                    let chem = crate::chem::parse_json(&path);
+                    if let Ok(_) = chem {
+                    } else {
+                        log::error!("path({}) parse error! will delete!!", &path);
+                        let _ = std::fs::remove_file(&path);
+                    }
+                } else {
+                    log::info!("path = {}, not exist!!", path);
+                }
+            });
+
+            start += step;
+        }
     }
 }

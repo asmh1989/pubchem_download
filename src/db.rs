@@ -6,7 +6,7 @@ use mongodb::{
     bson::{self, doc, Bson, Document},
     error::Error,
     options::{ClientOptions, FindOneOptions, FindOptions},
-    sync::Client,
+    sync::{Client, Collection, Cursor},
 };
 use once_cell::sync::OnceCell;
 use serde::de::DeserializeOwned;
@@ -85,17 +85,17 @@ impl Db {
         collection.find_one(filter, options)
     }
 
-    pub fn find_one_with_table(
+    pub fn find_with_table(
         table: &str,
         c: &str,
         filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<Document>, Error> {
+        options: impl Into<Option<FindOptions>>,
+    ) -> Result<Cursor<Document>, Error> {
         let client = Db::get_instance();
         let db = client.database(table);
-        let collection = db.collection(c);
+        let collection: Collection<Document> = db.collection(c);
 
-        collection.find_one(filter, options)
+        collection.find(filter, options)
     }
 
     pub fn insert_many(table: &str, data: Vec<Document>) -> Result<(), Error> {
@@ -204,6 +204,19 @@ impl Db {
         let collection = db.collection::<Document>(c);
 
         let result = collection.count_documents(filter, None);
+
+        match result {
+            Ok(d) => d,
+            Err(_) => 0,
+        }
+    }
+
+    pub fn count_with_table2(table: &str, c: &str) -> u64 {
+        let client = Db::get_instance();
+        let db = client.database(table);
+        let collection = db.collection::<Document>(c);
+
+        let result = collection.estimated_document_count(None);
 
         match result {
             Ok(d) => d,

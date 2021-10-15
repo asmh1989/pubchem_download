@@ -127,7 +127,7 @@ fn get_url(f: usize) -> String {
 // }
 
 pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
-    let step = 20000000;
+    let step = 10000;
     let v = HTTP_PROXYS.lock().unwrap().clone();
     let count = v.len();
 
@@ -154,7 +154,9 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
     let w = Mutex::new(work);
 
     loop {
-        (max(1, index * step)..(index + 1) * step)
+        info!("start download : {}", index);
+
+        (max(1, index)..(index + step))
             .into_par_iter()
             .for_each(|f| {
                 let path = format!("data/{}", get_path_by_id(f));
@@ -194,30 +196,35 @@ pub fn download_chems_proxy(start: usize, use_db: bool, threads: usize) {
                     }
                 }
             });
-
-        thread::sleep(Duration::from_millis(2000));
-
-        index += 1;
+        index += step;
     }
 }
 
 pub fn download_chems(start: usize, use_db: bool) {
-    let step = 20000000;
+    let step = 1000;
 
-    (max(1, start * step)..(start + 1) * step)
-        .into_par_iter()
-        .for_each(|f| {
-            let path = format!("data/{}", get_path_by_id(f as usize));
+    let mut index = start;
+    loop {
+        info!("start download : {}", index);
+        (max(1, index)..(index + step))
+            .into_par_iter()
+            .for_each(|f| {
+                let path = format!("data/{}", get_path_by_id(f as usize));
 
-            if !file_exist(&path) {
-                if !use_db || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string())) {
-                    let result = fetch_url(f, path.clone(), use_db, "");
-                    if result.is_err() {
-                        info!("id = {} , result = {:?}", f, result);
+                if !file_exist(&path) {
+                    if !use_db
+                        || !Db::contians(COLLECTION_CID_NOT_FOUND, filter_cid!(&f.to_string()))
+                    {
+                        let result = fetch_url(f, path.clone(), use_db, "");
+                        if result.is_err() {
+                            info!("id = {} , result = {:?}", f, result);
+                        }
                     }
                 }
-            }
-        });
+            });
+
+        index += step;
+    }
 }
 
 #[cfg(test)]

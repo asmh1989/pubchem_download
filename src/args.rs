@@ -12,13 +12,8 @@ pub struct Opt {
     #[structopt(short = "j", help = "并行任务数", default_value = "1")]
     pub jobs: usize,
 
-    #[structopt(
-        long = "block",
-        short = "b",
-        help = "下载任务起始cid, 按1000000份为一块",
-        default_value = "0"
-    )]
-    pub download_start: usize,
+    #[structopt(long = "start", help = "起始id", default_value = "1")]
+    pub start: usize,
 
     #[structopt(
         long = "enable-filter",
