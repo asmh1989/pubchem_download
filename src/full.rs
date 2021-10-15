@@ -1,5 +1,8 @@
 use log::info;
-use mongodb::bson::{self, doc, Document};
+use mongodb::{
+    bson::{self, doc, Bson, Document},
+    options::FindOneOptions,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +16,7 @@ const DB_TABLE: &'static str = "szdata";
 const DB_COLLECT: &'static str = "molecular";
 
 const SOURCE: &'static str = "PubChem";
-const STEP: usize = 1000;
+const STEP: usize = 200;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -91,9 +94,25 @@ impl SZData {
         }
         Ok(())
     }
+
+    pub fn insert_db(&self) -> Result<(), String> {
+        let doc = match bson::to_bson(&self) {
+            Ok(d) => d.as_document().unwrap().clone(),
+            Err(e) => {
+                info!("to_bson err {}", e);
+                return Err(format!("to_bson error : {}", e));
+            }
+        };
+
+        if let Err(e) = Db::insert_with_table(DB_TABLE, DB_COLLECT, doc.clone()) {
+            info!("db save error {} ", e);
+            return Err(format!("db save error {} ", e));
+        }
+        Ok(())
+    }
 }
 
-fn parse_chem(chem: &Chem) {
+fn parse_chem(chem: &Chem, update: bool) {
     let cid = chem.record.record_number;
     let mut properties: Vec<Properties> = Vec::new();
     let mut cas = "".to_string();
@@ -220,39 +239,70 @@ fn parse_chem(chem: &Chem) {
     );
     // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
 
-    let _ = f.save_db();
+    if update {
+        let _ = f.save_db();
+    } else {
+        let _ = f.insert_db();
+    }
 }
 
-fn save_by_path(path: &str) {
+fn save_by_path(path: &str, update: bool) {
     if download::file_exist(path) {
         let chem = crate::chem::parse_json(path).unwrap();
-        parse_chem(&chem);
+        parse_chem(&chem, update);
     } else {
         log::info!("path = {}, not exist!!", path);
     }
 }
 
 pub fn save_to_db(data: &str) {
-    let count =
-        Db::count_with_table(DB_TABLE, DB_COLLECT, doc! {"source" : SOURCE.to_string()}) as usize;
+    let find_options = FindOneOptions::builder().sort(doc! { "cid": -1 }).build();
 
-    let mut start = if count > STEP {
-        (count - STEP) / STEP
-    } else {
-        0
-    };
+    let last = Db::find_one_with_table(
+        DB_TABLE,
+        DB_COLLECT,
+        doc! {"source" : SOURCE.to_string()},
+        find_options,
+    );
+
+    let mut start = 0;
+
+    if let Ok(c) = last {
+        if let Some(cc) = c {
+            let result = bson::from_bson::<SZData>(Bson::Document(cc));
+            if let Ok(ccc) = result {
+                start = ccc.cid as usize;
+            }
+        }
+    }
+
+    let count = Db::count_with_table(DB_TABLE, DB_COLLECT, doc! {"source" : SOURCE.to_string()});
 
     info!("find already count = {}, start save id = {}", count, start);
 
-    loop {
-        let max = std::cmp::max(1, start * STEP);
-        info!("start save {} ... ", max);
-        (max..(start + 1) * STEP).into_par_iter().for_each(|f| {
+    if count > 0 {
+        info!("先尝试更新...");
+        let p = start - start % STEP;
+
+        (p..(start + STEP)).into_par_iter().for_each(|f| {
             let path = format!("{}/{}", data, crate::download::get_path_by_id(f));
-            save_by_path(&path);
+            save_by_path(&path, true);
         });
 
-        start += 1;
+        start = p + STEP;
+    }
+
+    info!("开始插入... start = {}", start);
+
+    loop {
+        let max = std::cmp::max(1, start);
+        info!("start save {} ... ", max);
+        (max..(max + STEP)).into_par_iter().for_each(|f| {
+            let path = format!("{}/{}", data, crate::download::get_path_by_id(f));
+            save_by_path(&path, false);
+        });
+
+        start += STEP;
     }
 }
 
@@ -268,7 +318,7 @@ mod tests {
 
         let chem = crate::chem::parse_json(&path).unwrap();
 
-        parse_chem(&chem);
+        parse_chem(&chem, false);
     }
 
     fn init() {

@@ -85,6 +85,19 @@ impl Db {
         collection.find_one(filter, options)
     }
 
+    pub fn find_one_with_table(
+        table: &str,
+        c: &str,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOneOptions>>,
+    ) -> Result<Option<Document>, Error> {
+        let client = Db::get_instance();
+        let db = client.database(table);
+        let collection = db.collection(c);
+
+        collection.find_one(filter, options)
+    }
+
     pub fn insert_many(table: &str, data: Vec<Document>) -> Result<(), Error> {
         let client = Db::get_instance();
         let db = client.database(TABLE_NAME);
@@ -127,21 +140,31 @@ impl Db {
         let date = Bson::DateTime(mongodb::bson::DateTime::now());
         update_doc.insert(KEY_UPDATE_TIME, date.clone());
 
-        let result = collection.find_one_and_update(
-            filter.clone(),
-            doc! {"$set": update_doc.clone()},
-            None,
-        )?;
+        let result = collection.find_one(filter.clone(), None)?;
 
         if !result.is_none() {
-            info!("db update: {:?}", filter.clone());
-            // collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
+            // info!("db update: {:?}", filter.clone());
+            collection.update_one(filter.clone(), doc! {"$set": update_doc}, None)?;
         } else {
             update_doc.insert(KEY_CREATE_TIME, date);
             let _ = collection.insert_one(update_doc, None)?;
 
             // info!("db insert {:?}", filter.clone());
         }
+
+        Ok(())
+    }
+
+    pub fn insert_with_table(table: &str, c: &str, app: Document) -> Result<(), Error> {
+        let client = Db::get_instance();
+        let db = client.database(table);
+        let collection = db.collection(c);
+
+        let mut update_doc = app;
+        let date = Bson::DateTime(mongodb::bson::DateTime::now());
+        update_doc.insert(KEY_UPDATE_TIME, date.clone());
+        update_doc.insert(KEY_CREATE_TIME, date);
+        let _ = collection.insert_one(update_doc, None)?;
 
         Ok(())
     }
