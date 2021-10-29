@@ -38,6 +38,7 @@ pub struct SZData {
     pub cas: String,
     pub molecular_weight: String,
     pub properties: Vec<Properties>,
+    pub names: Vec<String>,
     pub source: String,
 }
 
@@ -50,6 +51,7 @@ impl SZData {
         properties: Vec<Properties>,
         cas: String,
         inchi_key: String,
+        names: Vec<String>,
     ) -> Self {
         Self {
             id: None,
@@ -61,6 +63,7 @@ impl SZData {
             cas,
             properties,
             source: SOURCE.to_string(),
+            names,
         }
     }
 
@@ -121,6 +124,7 @@ fn parse_chem(chem: &Chem, update: bool) {
     let mut isomeric_smiles = "".to_string();
     let mut inchi = "".to_string();
     let mut inchi_key = "".to_string();
+    let mut names = Vec::new();
     chem.record
         .section
         .iter()
@@ -159,6 +163,18 @@ fn parse_chem(chem: &Chem, update: bool) {
                             "CAS" => {
                                 cas = s3.information[0].value.string_with_markup[0].string.clone();
                             }
+                            _ => {}
+                        });
+                    }
+                    "Synonyms" => {
+                        s2.section.iter().for_each(|s3| match &s3.tocheading[..] {
+                            "Depositor-Supplied Synonyms" => s3.information[0]
+                                .value
+                                .string_with_markup
+                                .iter()
+                                .for_each(|d| {
+                                    names.push(d.string.clone());
+                                }),
                             _ => {}
                         });
                     }
@@ -236,6 +252,7 @@ fn parse_chem(chem: &Chem, update: bool) {
         properties,
         cas,
         inchi_key,
+        names,
     );
     // info!("filter = {}", serde_json::to_string_pretty(&f).unwrap())
 
@@ -275,10 +292,12 @@ fn find_max_cid() -> usize {
     let mut start = 0;
 
     if let Ok(mut c) = last {
-        if let Ok(cc) = c.next().unwrap() {
-            let result = bson::from_bson::<SZData>(Bson::Document(cc));
-            if let Ok(ccc) = result {
-                start = ccc.cid as usize;
+        if let Some(ccc) = c.next() {
+            if let Ok(cc) = ccc {
+                let result = bson::from_bson::<SZData>(Bson::Document(cc));
+                if let Ok(ccc) = result {
+                    start = ccc.cid as usize;
+                }
             }
         }
     }
@@ -317,7 +336,7 @@ pub fn save_to_db(data: &str) {
 
         start += STEP;
 
-        if start > 101233349 {
+        if start > 111460000 {
             info!("finish ...");
             break;
         }
@@ -332,10 +351,22 @@ mod tests {
     fn test_max_cid() {
         crate::db::init_db("mongodb://sz:sz@192.168.2.26:27017");
         crate::config::init_config();
-        info!("start find max cid");
-        info!("max cid = {}", find_max_cid());
-        info!("count ...");
-        info!("count = {}", Db::count_with_table2(DB_TABLE, DB_COLLECT));
+        // info!("start find max cid");
+        // info!("max cid = {}", find_max_cid());
+        // info!("count ...");
+        // info!("count = {}", Db::count_with_table2(DB_TABLE, DB_COLLECT));
+
+        info!("start find");
+        info!(
+            "find {:?}",
+            Db::find_one_with_table(
+                "szdata",
+                "molecular",
+                // mongodb::bson::doc!("smiles":"C(CC(=O)N)CN=C(N)N"),
+                mongodb::bson::doc! {"inchi":"InChI=1S/C5H12N4O/c6-4(10)2-1-3-9-5(7)8/h1-3H2,(H2,6,10)(H4,7,8,9)"},
+                None
+            )
+        );
     }
 
     #[test]

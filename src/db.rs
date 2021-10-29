@@ -85,6 +85,19 @@ impl Db {
         collection.find_one(filter, options)
     }
 
+    pub fn find_one_with_table(
+        table: &str,
+        c: &str,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOneOptions>>,
+    ) -> Result<Option<Document>, Error> {
+        let client = Db::get_instance();
+        let db = client.database(table);
+        let collection = db.collection(c);
+
+        collection.find_one(filter, options)
+    }
+
     pub fn find_with_table(
         table: &str,
         c: &str,
