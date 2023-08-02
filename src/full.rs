@@ -336,7 +336,7 @@ pub fn save_to_db(data: &str) {
 
         start += STEP;
 
-        if start > 111460000 {
+        if start > 157010585 {
             info!("finish ...");
             break;
         }

@@ -53,7 +53,7 @@ pub struct Opt {
     #[structopt(
         short = "s",
         long = "sql",
-        default_value = "192.168.2.25:27017",
+        default_value = "192.168.2.26:27017",
         help = "mongodb 服务地址"
     )]
     pub sql: String,

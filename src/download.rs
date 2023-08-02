@@ -19,12 +19,12 @@ use crate::{
 static HTTP_PROXYS: Lazy<Mutex<Vec<&str>>> = Lazy::new(|| {
     let m = [
         (""),
-        ("192.168.2.25:28080"),
-        ("192.168.2.25:28081"),
-        ("192.168.2.25:28082"),
+        // ("192.168.2.25:28080"),
+        // ("192.168.2.25:28081"),
+        // ("192.168.2.25:28082"),
         // ("192.168.2.25:28083"),
-        ("173.82.20.11:18888"),
-        ("192.168.2.25:7890"),
+        // ("173.82.20.11:18888"),
+        ("192.168.2.212:7890"),
         // ("192.168.2.25:7891"),
         // ("192.168.2.25:7892"),
         // ("192.168.2.25:7893"),
@@ -204,6 +204,8 @@ pub fn download_chems(start: usize, use_db: bool) {
     let step = 1000;
 
     let mut index = start;
+    let max_err = 20;
+    let cur_err = Mutex::new(0);
     loop {
         info!("start download : {}", index);
         (max(1, index)..(index + step))
@@ -218,10 +220,19 @@ pub fn download_chems(start: usize, use_db: bool) {
                         let result = fetch_url(f, path.clone(), use_db, "");
                         if result.is_err() {
                             info!("id = {} , result = {:?}", f, result);
+                            *cur_err.lock().unwrap() += 1;
+                        } else {
+                            *cur_err.lock().unwrap() = 0;
                         }
                     }
                 }
             });
+
+        let err = *cur_err.lock().unwrap();
+        if err > max_err {
+            info!("错误太多, 暂停: cur_err = {}", err);
+            return;
+        }
 
         index += step;
     }
